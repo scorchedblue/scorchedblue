@@ -44,6 +44,24 @@ RUN mkdir -p /out \
     && tar -xzf "${STARSHIP_TARBALL}" -C /out starship \
     && /out/starship --version
 
+# mise is not packaged by Fedora at all, so the same pattern applies. Upstream
+# publishes a bare static musl binary -- no tarball to unpack, and no linkage to
+# the base, which is exactly the property that made this the right route for
+# starship.
+#
+# Upstream also signs SHASUMS256.txt with minisign. The hash is pinned here
+# rather than fetched, because fetching it from the host that serves the binary
+# would verify very little.
+ARG MISE_VERSION=v2026.9.1
+ARG MISE_SHA256=fb5111a3e46389bcfc026632e5dc0cfdd45b6565146c21bdb9c7a75ccefbc193
+ARG MISE_BINARY=mise-v2026.9.1-linux-x64-musl
+
+RUN curl -fsSL -o /out/mise \
+    "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/${MISE_BINARY}" \
+    && echo "${MISE_SHA256}  /out/mise" | sha256sum -c - \
+    && chmod +x /out/mise \
+    && /out/mise --version
+
 # ---------------------------------------------------------------------------
 # Homebrew payload.
 #
@@ -160,6 +178,7 @@ RUN --mount=type=bind,from=akmods,src=/rpms,dst=/tmp/akmods/rpms \
     /tmp/scripts/20-nvidia.sh
 
 COPY --from=fetch /out/starship /usr/bin/starship
+COPY --from=fetch /out/mise /usr/bin/mise
 COPY --from=brew /homebrew.tar.zst /usr/share/homebrew.tar.zst
 COPY --from=quickshell /out/ /
 

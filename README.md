@@ -91,6 +91,14 @@ The image tier is deliberately small and each entry earns its place: `chezmoi`
 `git-delta` (the configured git pager -- absent, `sudo git` fails confusingly),
 plus `ripgrep` and `fd-find`.
 
+`gh`, `just` and `mise` are admitted on a **second, narrower gate**: they are
+the tooling this system is worked on with. A machine that cannot run `just ci`,
+reach its own repositories, or resolve a pinned toolchain until Homebrew has
+finished provisioning cannot bootstrap or repair itself -- and first boot is
+exactly when that matters. The gate admits tools needed to *work on* the
+system, not tools that are pleasant to have while working on it. `git` needs no
+entry: `git-core` comes from the base and provides `/usr/bin/git`.
+
 ## Things that will bite
 
 **Kernel lockstep.** The akmods image must be built against the same kernel as

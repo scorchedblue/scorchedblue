@@ -61,10 +61,31 @@ dnf5 -y install --setopt=install_weak_deps=False \
     fd-find \
     fastfetch \
     wl-clipboard \
-    inotify-tools
+    inotify-tools \
+    gh \
+    just
+
+### git is already here ------------------------------------------------------
+# Not listed above because `git-core` comes from the base and provides
+# /usr/bin/git. The full `git` package adds gitk, git-email and the perl
+# tooling, none of which this image has a use for. `just test` asserts the
+# binary rather than a package name, so this stays correct either way.
+
+### Why gh and just are in the image ----------------------------------------
+# They fail the "works before login, as root, or on a broken system" test that
+# governs the rest of this list, so they are here on a second, narrower
+# argument: this is a terminal-first workstation whose own tooling is driven by
+# `just`, and whose repositories are driven by `gh`. A machine that cannot run
+# `just ci` until Homebrew has finished provisioning cannot repair itself, and
+# first-boot provisioning is exactly when a machine is most likely to need it.
+#
+# Both are single static-ish binaries packaged by Fedora, with no runtime stack
+# behind them -- the property that keeps httpie out, below, does not apply.
+# just-1.57.0 also matches the version mise pins for the repositories, so the
+# image and a checkout agree by construction.
 
 ### Leaf tools: NOT here --------------------------------------------------
-# gh, httpie, zoxide, bat, tealdeer and the rest of the interactive long tail
+# httpie, zoxide, bat, tealdeer and the rest of the interactive long tail
 # belong to the Homebrew tier, provisioned by scorched-brew-setup.service and
 # installed from a Brewfile that scorched-desktop manages via chezmoi.
 #

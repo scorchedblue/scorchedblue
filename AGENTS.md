@@ -121,6 +121,18 @@ Needs to work before login, as root, or on a broken system → **image**. GUI ap
 → **Flatpak**. Drags a language runtime or heavy deps → **container**.
 Otherwise → **Homebrew**. Language runtimes belong to **mise**.
 
+**The second gate: the project's own tooling.** `gh`, `just` and `mise` are in
+the image despite failing the test above. A terminal-first workstation whose
+tooling is driven by `just`, whose repositories are driven by `gh`, and whose
+toolchains are pinned by `mise` cannot bootstrap or repair itself if all three
+wait on Homebrew provisioning. This gate is narrow on purpose: it admits the
+tools needed to *work on this system*, not the tools that are pleasant to have
+while working on it. `httpie`, `bat` and `zoxide` still go to Homebrew.
+
+All three are single binaries with no runtime stack behind them. That property
+is doing real work here -- it is the reason `httpie`, which drags python3-pip
+and python3-requests into `/usr`, is not admitted by the same argument.
+
 Homebrew cannot be baked into the image: `/home` is a symlink to `var/home`, so
 an installed brew lives in `/var`. The image ships the payload; the systemd unit
 provisions it.

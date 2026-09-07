@@ -168,6 +168,15 @@ test: build
     # fails silently rather than loudly. Assert the recipes are listed.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'ujust --list | grep -q scorched-info && echo "ujust recipes: ok"'
+    # The Claude recipes are opt-in tooling, so nothing else would notice if the
+    # import silently stopped exposing them.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'ujust --list | grep -q scorched-claude && echo "claude recipes: ok"'
+    # They are recipes, not an installed binary. Claude must NOT be in the
+    # image: its updater rewrites ~/.local, /usr is read-only, and a public OS
+    # image should not ship an AI CLI to people who did not ask for one.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        '! command -v claude >/dev/null && echo "claude correctly absent from the image: ok"'
     # Tailscale is first-class: daemon present, CLI present, unit enabled.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'command -v tailscale >/dev/null && command -v tailscaled >/dev/null \
@@ -176,6 +185,21 @@ test: build
     # The image must carry no identity -- no auth key, no node state.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '[ ! -e /var/lib/tailscale/tailscaled.state ] && echo "tailscale carries no identity: ok"'
+    # The project's own tooling, admitted on the second placement gate. These
+    # must be reachable before Homebrew has provisioned anything, because first
+    # boot is exactly when a machine needs to be able to repair itself.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'command -v git >/dev/null && command -v gh >/dev/null \
+         && command -v just >/dev/null && command -v mise >/dev/null \
+         && echo "project tooling: ok"'
+    # mise is vendored, not packaged -- assert it actually runs. A binary built
+    # against the wrong libc would be present and non-functional, and nothing
+    # else here would notice.
+    podman run --rm {{ image }}:{{ tag }} mise --version
+    # just in the image must match what mise pins for the repositories, or a
+    # machine and a checkout can disagree about the same recipe.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        '[ "$(just --version | cut -d" " -f2)" = "1.57.0" ] && echo "just version matches the mise pin: ok"'
     # The boot menu must name the image. ostree builds the BLS title as
     # "${PRETTY_NAME} (ostree:N)" at deployment time, so a wrong PRETTY_NAME is
     # invisible until a machine reboots with two deployments and cannot tell
