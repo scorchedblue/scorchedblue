@@ -177,6 +177,121 @@ RUN curl -fsSLO "https://github.com/quickshell-mirror/quickshell/archive/refs/ta
     && /out/usr/bin/quickshell --version
 
 # ---------------------------------------------------------------------------
+# Ghostty, built from source.
+#
+# The terminal is the work surface, so it belongs in the image rather than in
+# Homebrew. Fedora does not package ghostty and there is no static binary to
+# vendor -- it links GTK4 -- so this is a builder stage, the same pattern
+# quickshell uses.
+#
+# Zig 0.15.2, NOT 0.16.0. Ghostty's main branch is 1.3.2-dev and declares
+# 0.16.0; the 1.3.1 tag declares 0.15.2. Fedora 44 packages both, and a plain
+# `dnf install zig` resolves to the newer one, which fails the build with a
+# compiler error rather than a version message. Hence the versioned package
+# name and the assertion below.
+#
+# release.files.ghostty.org, not release.ghostty.org -- the latter is the
+# announcement site and serves no tarballs. Take the RELEASE tarball rather
+# than GitHub's auto-generated one: upstream preprocesses it, which is what
+# removes the need for `pandoc` (absent from Fedora 44 entirely) and for
+# fetching git dependencies during the build.
+#
+# Verified with minisign against upstream's published release-signing key as
+# well as a pinned sha256. Both, because they answer different questions: the
+# signature says upstream produced this artefact, the pinned hash says it is
+# the same artefact this repository was reviewed against. The public key is
+# allowlisted in .gitleaks.toml -- a generic entropy detector cannot tell a
+# minisign public key from a credential.
+#
+# The tarball is then made to prove it is what the ARGs claim. A pinned hash
+# says "this is the file we expected"; reading .version and
+# .minimum_zig_version out of build.zig.zon says "and it is the ghostty and
+# the zig this stage is documented for", which is what actually goes stale.
+#
+# zlib-ng-compat-devel, not zlib-devel: Fedora 44 ships no package by the
+# latter name.
+#
+# fetch-zig-cache.sh is upstream's own script for populating the Zig package
+# cache, after which `--system` builds with no further network access.
+# -Dcpu=baseline because this image runs on machines we do not own.
+# -Demit-docs=false skips the manpage/HTML build, which is the part that wants
+# pandoc. -Dgtk-x11=false because this is a Wayland-only system.
+#
+# Image size, measured: P1 (this tree without ghostty) 9,576,726,217 bytes,
+# with ghostty 9,611,166,952 -- +34,440,735 bytes, ~32.8 MiB. Nearly all of it
+# is the 27MB binary itself. The feared GTK4/libadwaita/GStreamer tax did not
+# materialise: gtk4, libadwaita, gstreamer1 and gstreamer1-plugins-base are
+# already in the base image, so the only RPM this adds to the final image is
+# gtk4-layer-shell (see scripts/12-session.sh). Recorded here because the
+# concern was reasonable and the answer is not guessable -- do not re-derive
+# it, re-measure it if the base moves.
+# ---------------------------------------------------------------------------
+FROM ${BASE_IMAGE}@${BASE_DIGEST} AS ghostty
+
+ARG GHOSTTY_VERSION=1.3.1
+ARG GHOSTTY_SHA256=3349d25600ffbda281197a18314f7d18791969cffe9474f0ff16a45a9ebfccdb
+ARG GHOSTTY_MINISIGN_KEY=RWQlAjJC23149WL2sEpT/l0QKy7hMIFhYdQOFy0Z7z7PbneUgvlsnYcV
+ARG ZIG_VERSION=0.15.2
+
+RUN dnf5 -y install --setopt=install_weak_deps=False \
+        "zig-${ZIG_VERSION}" minisign git \
+        pkgconf-pkg-config ncurses gettext blueprint-compiler \
+        gtk4-devel libadwaita-devel gtk4-layer-shell-devel \
+        gobject-introspection-devel \
+        gstreamer1-devel gstreamer1-plugins-base-devel \
+        libxkbcommon-devel wayland-devel mesa-libGL-devel \
+        fontconfig-devel freetype-devel harfbuzz-devel \
+        libpng-devel libxml2-devel oniguruma-devel \
+        bzip2-devel expat-devel zlib-ng-compat-devel \
+        glslang spirv-tools simdutf-devel
+
+# Assert the compiler, in the shape scripts/12-session.sh uses for the Hyprland
+# COPR: a dependency that can drift under us is checked at build time, loudly.
+# `zig-0.15.2` above already pins it, so this fires if Fedora ever retires that
+# package and the name resolves elsewhere.
+RUN got="$(rpm -q --qf '%{version}' zig)"; \
+    if [ "${got}" != "${ZIG_VERSION}" ]; then \
+        echo "FATAL: zig version drifted." >&2; \
+        echo "  expected: ${ZIG_VERSION}" >&2; \
+        echo "  got     : ${got}" >&2; \
+        echo "Ghostty pins one released Zig. Read build.zig.zon at the ghostty" >&2; \
+        echo "tag before touching ZIG_VERSION -- main declares a newer one." >&2; \
+        exit 1; \
+    fi; \
+    echo "OK: zig ${got} matches expected ${ZIG_VERSION}"
+
+RUN curl -fsSLO "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz" \
+    && curl -fsSLO "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz.minisig" \
+    && minisign -V -m "ghostty-${GHOSTTY_VERSION}.tar.gz" \
+        -x "ghostty-${GHOSTTY_VERSION}.tar.gz.minisig" \
+        -P "${GHOSTTY_MINISIGN_KEY}" \
+    && echo "${GHOSTTY_SHA256}  ghostty-${GHOSTTY_VERSION}.tar.gz" | sha256sum -c - \
+    && tar -xzf "ghostty-${GHOSTTY_VERSION}.tar.gz" \
+    && cd "ghostty-${GHOSTTY_VERSION}" \
+    && src_v="$(sed -n 's/^[[:space:]]*\.version = "\(.*\)",$/\1/p' build.zig.zon)" \
+    && src_z="$(sed -n 's/^[[:space:]]*\.minimum_zig_version = "\(.*\)",$/\1/p' build.zig.zon)" \
+    && if [ "${src_v}" != "${GHOSTTY_VERSION}" ] || [ "${src_z}" != "${ZIG_VERSION}" ]; then \
+        echo "FATAL: the ghostty source does not declare what this stage pins." >&2; \
+        echo "  ghostty expected: ${GHOSTTY_VERSION}  declared: ${src_v}" >&2; \
+        echo "  zig     expected: ${ZIG_VERSION}  declared: ${src_z}" >&2; \
+        exit 1; \
+    fi \
+    && echo "OK: ghostty ${src_v} declares minimum_zig_version ${src_z}"
+
+ENV ZIG_GLOBAL_CACHE_DIR=/tmp/offline-cache
+
+RUN cd "ghostty-${GHOSTTY_VERSION}" \
+    && ./nix/build-support/fetch-zig-cache.sh \
+    && DESTDIR=/out zig build --prefix /usr --system /tmp/offline-cache/p \
+        -Doptimize=ReleaseFast -Dcpu=baseline \
+        -Dversion-string="${GHOSTTY_VERSION}" \
+        -Demit-docs=false -Dgtk-x11=false \
+    && /out/usr/bin/ghostty --version \
+    && /out/usr/bin/ghostty --version | head -1 \
+        | grep -qx "Ghostty ${GHOSTTY_VERSION}" \
+    && rm -rf /out/usr/include /out/usr/share/pkgconfig
+
+# ---------------------------------------------------------------------------
 # The image itself.
 # ---------------------------------------------------------------------------
 FROM ${BASE_IMAGE}@${BASE_DIGEST}
@@ -200,6 +315,7 @@ COPY --from=fetch /out/mise /usr/bin/mise
 COPY --from=fetch /out/xh /usr/bin/xh
 COPY --from=brew /homebrew.tar.zst /usr/share/homebrew.tar.zst
 COPY --from=quickshell /out/ /
+COPY --from=ghostty /out/ /
 
 RUN /tmp/scripts/25-brew.sh
 RUN /tmp/scripts/28-branding.sh

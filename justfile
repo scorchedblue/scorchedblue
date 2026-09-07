@@ -219,6 +219,22 @@ test: build
     # Layershell is what the bar anchors to; without it the shell cannot exist.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'quickshell --help >/dev/null 2>&1 && echo "quickshell: ok"'
+    # Ghostty, also built from source. Run it rather than `command -v` it: the
+    # builder stage links GTK4, libadwaita, gstreamer and gtk4-layer-shell out
+    # of the base, so a missing runtime library would leave the binary present
+    # and unable to exec. Read the expected version from the Containerfile so
+    # a bump cannot leave this assertion behind, and match the whole line --
+    # `grep Ghostty` would pass on any version at all.
+    ghostty_version="$(grep -oP '(?<=^ARG GHOSTTY_VERSION=).*' Containerfile)"
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        "ghostty --version | head -1 | grep -qx 'Ghostty ${ghostty_version}'" \
+        && echo "ghostty ${ghostty_version}: ok"
+    # The terminfo entry is not optional furniture. Nothing here is installed by
+    # RPM -- it all arrives via COPY --from=ghostty -- so this is what proves
+    # the install tree came across and not just the binary. Without it every
+    # ssh into a host that lacks xterm-ghostty gets a broken TERM.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'test -f /usr/share/terminfo/x/xterm-ghostty && echo "ghostty terminfo: ok"'
     # Leaf tools must NOT be in the image -- they belong to the Homebrew tier.
     # httpie in particular drags a Python stack into /usr if it leaks back in.
     podman run --rm {{ image }}:{{ tag }} bash -c \
