@@ -1,22 +1,26 @@
 # ScorchedBlue -- core image.
 #
-# Built from Universal Blue's base-main. The session is Hyprland, so there is no
-# desktop environment to inherit and then strip -- a graphical base would only
-# add a session we immediately remove. This reverses an earlier choice of
+# Built from Universal Blue's base-nvidia. The session is Hyprland, so there is
+# no desktop environment to inherit and then strip -- a graphical base would
+# only add a session we immediately remove. This reverses an earlier choice of
 # silverblue-main, which was correct while the session was GNOME.
+#
+# base-nvidia rather than base-main plus in-house akmods. The open kernel module
+# (nvidia.ko reports Dual MIT/GPL), the full userspace and the i686 stack all
+# arrive from a build that produces them in lockstep with its own kernel, so the
+# kernel-mismatch trap that 20-nvidia.sh existed to catch cannot occur: there is
+# one image and one kernel.
+#
+# It does NOT bring the kernel arguments. base-nvidia:44 ships
+# /usr/lib/bootc/kargs.d empty, byte-identical to base-main's -- verified by
+# listing both. files/usr/lib/bootc/kargs.d/00-nvidia.toml therefore stays, and
+# `just test` still asserts each karg by name.
 #
 # The base is pinned by digest, never by floating tag, so a build is
 # reproducible and a base bump is an explicit, reviewable change.
 
-ARG BASE_IMAGE=ghcr.io/ublue-os/base-main
-ARG BASE_DIGEST=sha256:9342a22b7eabca2504f08697bb43141db4e425485bb604e8ed8166b83e550d37
-
-# akmods must be built against the same kernel as the base. uBlue publishes them
-# in lockstep; 20-nvidia.sh asserts the match rather than trusting it.
-ARG AKMODS_IMAGE=ghcr.io/ublue-os/akmods-nvidia-open
-ARG AKMODS_TAG=main-44
-
-FROM ${AKMODS_IMAGE}:${AKMODS_TAG} AS akmods
+ARG BASE_IMAGE=ghcr.io/ublue-os/base-nvidia
+ARG BASE_DIGEST=sha256:7adbf8d0d7f4eafc90c33bf1dc541988d39770699233ba1a9850a02cd23ea56f
 
 # ---------------------------------------------------------------------------
 # Vendored binaries: things Fedora does not package.
@@ -189,12 +193,6 @@ RUN /tmp/scripts/10-packages.sh
 RUN /tmp/scripts/12-session.sh
 RUN /tmp/scripts/15-tailscale.sh
 RUN /tmp/scripts/18-performance.sh
-
-# The akmods RPMs are bind-mounted rather than COPYed. A COPY would add a ~470MB
-# layer that the later cleanup cannot reclaim -- image layers are additive, so
-# `rm` in a subsequent RUN hides files without shrinking anything.
-RUN --mount=type=bind,from=akmods,src=/rpms,dst=/tmp/akmods/rpms \
-    /tmp/scripts/20-nvidia.sh
 
 COPY --from=fetch /out/starship /usr/bin/starship
 COPY --from=fetch /out/mise /usr/bin/mise

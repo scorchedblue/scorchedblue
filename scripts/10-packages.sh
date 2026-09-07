@@ -8,7 +8,7 @@
 set -euxo pipefail
 
 ### Remove ----------------------------------------------------------------
-# Nothing. base-main ships no desktop environment, so there is no application
+# Nothing. base-nvidia ships no desktop environment, so there is no application
 # payload to strip -- the reason the base moved here from silverblue-main.
 # Streamlining is additive again rather than subtractive, which also retires
 # the concern about removals re-applying on every base bump.

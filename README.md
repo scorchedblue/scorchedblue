@@ -20,11 +20,11 @@ image that was not chosen on purpose.
 
 | | |
 | --- | --- |
-| Base | `ghcr.io/ublue-os/base-main`, pinned by digest |
+| Base | `ghcr.io/ublue-os/base-nvidia`, pinned by digest |
 | Session | Hyprland only, with a Quickshell shell written in-house |
 | Terminal today | `foot`; Ghostty is sequenced but not yet built |
 | Shell | bash, with starship |
-| Graphics | NVIDIA open kernel modules via `ublue-os/akmods-nvidia-open` |
+| Graphics | NVIDIA open kernel modules, inherited from the base |
 | Target | RTX 3060 (Ampere), single GPU |
 
 ## Design record
@@ -111,18 +111,21 @@ ScorchedBlue is; Homebrew carries what you add on top.
 
 ## Things that will bite
 
-**Kernel lockstep.** The akmods image must be built against the same kernel as
-the base. `scripts/20-nvidia.sh` asserts this and fails the build loudly on
-mismatch, because the alternative is a machine that boots without a driver. CI
-runs daily to catch drift before it reaches hardware.
-
-**NVIDIA kernel arguments.** No RPM ships them. The base's NVIDIA images write
-`/usr/lib/bootc/kargs.d/00-nvidia.toml` during their own build, so an image that
-installs the akmods itself -- as this one does -- gets the driver and none of the
-boot-time configuration. Without it nouveau claims the GPU from the initrd,
+**NVIDIA kernel arguments.** No RPM ships them -- and neither does the NVIDIA
+base. `ghcr.io/ublue-os/base-nvidia` carries the driver, the userspace and the
+i686 stack, but its `/usr/lib/bootc/kargs.d` is empty, identical to
+`base-main`'s. `files/usr/lib/bootc/kargs.d/00-nvidia.toml` is therefore still
+ours to maintain. Without it nouveau claims the GPU from the initrd,
 `nvidia.ko` cannot attach, and the machine boots to a black screen with dead VTs.
 Nothing fails at build time: the image is valid, it simply cannot draw. `just
 test` asserts each karg by name, because this one has already cost a boot.
+
+**Kernel lockstep** used to be the sharpest failure mode here, back when the
+akmods came from a separate image that could drift from the base's kernel.
+Taking the driver from the base makes it structural -- one image, one kernel --
+so the build-time assertion is gone. `just test` still checks that `nvidia.ko`
+exists for the kernel the image ships, which is what would fire if that ever
+stopped being true.
 
 **Portal arbitration.** `xdg-desktop-portal-hyprland` must win `ScreenCast`, or
 arbitrary-region sharing -- the capability the GNOME session could not provide,

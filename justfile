@@ -45,6 +45,8 @@ test: build
     podman run --rm {{ image }}:{{ tag }} bootc container lint
     # The NVIDIA userspace must be present, not just the kernel module -- a kmod
     # with no userspace yields no nvidia-smi, no GL, and no working session.
+    # These come from base-nvidia now rather than from akmods RPMs we install,
+    # so this asserts the base is the one we think it is.
     podman run --rm {{ image }}:{{ tag }} bash -c 'command -v nvidia-smi'
     podman run --rm {{ image }}:{{ tag }} rpm -q \
         kmod-nvidia nvidia-kmod-common nvidia-driver nvidia-driver-libs nvidia-modprobe
@@ -52,15 +54,25 @@ test: build
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'rpm -qa --qf "%{name}.%{arch}\n" | grep -q "^nvidia-driver-libs.i686$" && echo "32-bit GL: ok"'
     # The driver is inert without the kargs that let it reach the GPU. No RPM
-    # ships them -- uBlue's NVIDIA images write the file during the image build,
-    # so installing the akmods RPMs ourselves gets the driver and misses this.
-    # Absent them nouveau claims the card from the initrd, nvidia.ko cannot
-    # attach, and the machine boots to a black screen with dead VTs: a fully
-    # valid image that cannot draw. Assert each karg by name.
+    # ships them and neither does base-nvidia: its /usr/lib/bootc/kargs.d is
+    # empty, identical to base-main's, so the move to an NVIDIA base did not
+    # retire files/usr/lib/bootc/kargs.d/00-nvidia.toml. Absent them nouveau
+    # claims the card from the initrd, nvidia.ko cannot attach, and the machine
+    # boots to a black screen with dead VTs: a fully valid image that cannot
+    # draw. Assert each karg by name.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'for k in rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nvidia-drm.modeset=1 initcall_blacklist=simpledrm_platform_driver_init; do \
              grep -qsF "$k" /usr/lib/bootc/kargs.d/*.toml || { echo "MISSING KARG: $k"; exit 1; }; \
          done; echo "nvidia kargs: ok"'
+    # The kmod must exist for the kernel this image actually ships. Taking the
+    # driver from the base makes lockstep structural rather than something to
+    # police -- one image, one kernel -- which is why scripts/20-nvidia.sh and
+    # its AKMODS_TAG check are gone. This is what remains of that assertion, and
+    # it is what would fire if a future base ever shipped the two out of step.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'k="$(rpm -q --qf "%{version}-%{release}.%{arch}" kernel-core)"; \
+         ls "/usr/lib/modules/$k/extra/nvidia/nvidia.ko"* >/dev/null \
+         && echo "kmod matches shipped kernel $k: ok"'
     # Vendored binary landed and runs.
     podman run --rm {{ image }}:{{ tag }} starship --version
     # Image-tier tools are present.
@@ -80,7 +92,7 @@ test: build
     # vanish silently -- assert the file landed.
     podman run --rm {{ image }}:{{ tag }} \
         test -f /usr/share/fastfetch/logos/scorchedblue.txt
-    # base-main must not have dragged in a desktop environment.
+    # base-nvidia must not have dragged in a desktop environment.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '! rpm -q gnome-shell gdm mutter >/dev/null 2>&1 && echo "no inherited desktop: ok"'
     # The session: compositor, portal and greeter.
