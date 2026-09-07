@@ -24,8 +24,9 @@ dnf5 -y install --setopt=install_weak_deps=False \
     xdg-desktop-portal-gtk
 
 ### Assert the compositor version -------------------------------------------
-# The akmods lockstep taught this lesson: a dependency that can silently drift
-# should be checked at build time, loudly.
+# The NVIDIA kernel lockstep taught this lesson before base-nvidia made it
+# structural: a dependency that can silently drift should be checked at build
+# time, loudly.
 got="$(rpm -q --qf '%{version}' hyprland)"
 case "${got}" in
     "${WANT_HYPRLAND_MAJOR_MINOR}".*)

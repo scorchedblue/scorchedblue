@@ -3,7 +3,7 @@
 set -euxo pipefail
 
 dnf5 clean all
-rm -rf /tmp/akmods /tmp/scripts
+rm -rf /tmp/scripts
 
 # /var must be empty in a bootc image: anything left here becomes part of the
 # deployment's initial /var rather than the immutable /usr, and will not be

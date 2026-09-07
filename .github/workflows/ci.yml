@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The base image rebuilds daily; catch base/akmods kernel drift before it
-  # reaches a machine rather than after.
+  # The base image rebuilds daily and the Hyprland COPR moves on its own; catch
+  # drift in either before it reaches a machine rather than after.
   schedule:
     - cron: "0 6 * * *"
 
