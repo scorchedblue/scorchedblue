@@ -1,0 +1,37 @@
+# gitleaks configuration for ScorchedBlue.
+#
+# `just secrets` runs `gitleaks detect`, whose default log options are
+# `--full-history --all`. That means every ref, including `refs/stash` -- which
+# is deliberate. A secret parked in a stash is still a secret on this disk, and
+# an unattended run stashes its working tree whenever it is interrupted.
+#
+# It is also why a false positive here is not merely noise. A finding that
+# cannot be resolved fails `just ci`, which fails the run, which stashes the
+# work that produced the finding -- and every later run then scans that stash
+# and fails identically. The gate does not recover on its own.
+
+# Extend the built-in rule set rather than replace it. Without this, the rules
+# defined here would be the ONLY rules gitleaks knows and every default
+# detector would be silently switched off.
+[extend]
+useDefault = true
+
+# Ghostty's minisign PUBLIC key, used by the builder stage to verify the
+# release tarball's signature.
+#
+# It is published by upstream precisely so that anyone can verify a release
+# against it; a public key that is kept secret verifies nothing. gitleaks has
+# no rule for minisign, so `generic-api-key` claims it on entropy alone (5.23)
+# -- the `RW` prefix and 56-character base64 body of a minisign public key look
+# exactly like a credential to a generic detector.
+#
+# Scoped as tightly as the format allows: `condition = "AND"` requires BOTH the
+# path and the exact key value, and the secret pattern is anchored, so this
+# allowlists one known published string in one file and nothing else. A
+# different high-entropy value on the same line, or this value anywhere else,
+# still fails the scan.
+[[allowlists]]
+description = "Ghostty minisign public key (upstream release-signing key, published)"
+condition = "AND"
+paths = ['''^Containerfile$''']
+regexes = ['''^RWQlAjJC23149WL2sEpT/l0QKy7hMIFhYdQOFy0Z7z7PbneUgvlsnYcV$''']
