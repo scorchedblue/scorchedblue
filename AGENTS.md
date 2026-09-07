@@ -66,6 +66,17 @@ without re-arguing them.
   base and kmod cannot diverge the way they could when the akmods came from a
   second image. `just test` checks that `nvidia.ko` exists for the shipped
   kernel, which is all that remains of the old build-time assertion.
+- **`base-nvidia` ships the OPEN kmod, and nothing on the surface says so.**
+  The package is named `kmod-nvidia` whichever flavour is built, and its RPM
+  `License` tag reads *NVIDIA License* even for the open modules; the image
+  labels say nothing either. The single distinguishing fact is the module's own
+  `MODULE_LICENSE`: `modinfo -k "$(rpm -q --qf '%{version}-%{release}.%{arch}'
+  kernel-core)" -F license nvidia` prints `Dual MIT/GPL` for the open kmod and
+  `NVIDIA` for the proprietary one. Measured against
+  `base-nvidia@sha256:7adbf8d0…`: `Dual MIT/GPL`, `kmod-nvidia-610.57.04-1.fc44`.
+  We are on the open modules deliberately, so `just test` asserts that string by
+  name -- a base bump that swapped flavours would pass every other NVIDIA check
+  here.
 - **Keep `files/usr/lib/bootc/kargs.d/00-nvidia.toml`.** No RPM ships these
   kargs and **`base-nvidia` does not write them either** -- its
   `/usr/lib/bootc/kargs.d` is empty, byte-identical to `base-main`'s, and
