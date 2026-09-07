@@ -73,6 +73,20 @@ test: build
         'k="$(rpm -q --qf "%{version}-%{release}.%{arch}" kernel-core)"; \
          ls "/usr/lib/modules/$k/extra/nvidia/nvidia.ko"* >/dev/null \
          && echo "kmod matches shipped kernel $k: ok"'
+    # ...and it must be the OPEN kmod. Nothing visible says which flavour a base
+    # ships: base-nvidia names the package `kmod-nvidia` either way, and its RPM
+    # License tag reads "NVIDIA License" even for the open modules. The only
+    # thing that distinguishes them is the module's own MODULE_LICENSE -- the
+    # open kmod declares "Dual MIT/GPL", the proprietary one declares "NVIDIA".
+    # So assert that string by name: a base bump that silently swapped flavours
+    # would otherwise pass every other NVIDIA check in this recipe.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'k="$(rpm -q --qf "%{version}-%{release}.%{arch}" kernel-core)"; \
+         lic="$(modinfo -k "$k" -F license nvidia)"; \
+         [ "$lic" = "Dual MIT/GPL" ] || { \
+             echo "nvidia.ko declares \"$lic\"; expected \"Dual MIT/GPL\" (open kmod)" >&2; \
+             exit 1; }; \
+         echo "nvidia driver flavour: open kmod, Dual MIT/GPL: ok"'
     # Vendored binary landed and runs.
     podman run --rm {{ image }}:{{ tag }} starship --version
     # Image-tier tools are present.
