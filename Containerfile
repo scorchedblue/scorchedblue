@@ -62,6 +62,25 @@ RUN curl -fsSL -o /out/mise \
     && chmod +x /out/mise \
     && /out/mise --version
 
+# xh is the HTTP client of the work surface, and Fedora does not package it.
+# Static musl, built against rustls rather than native-tls, so it carries no
+# OpenSSL linkage to the base either.
+#
+# Upstream publishes no checksum file at all -- not even the bare hash starship
+# serves. This one was computed from the downloaded artefact and pinned here,
+# which is the same trust position: the hash lives in this repository, where a
+# change to it is reviewable, rather than being fetched from the host that
+# serves the tarball.
+ARG XH_VERSION=v0.26.2
+ARG XH_SHA256=8c53b6a23435754f9e2ea8ab8c0d0296a1921404b88132cf9b364ff6e8c22a6e
+ARG XH_TARBALL=xh-v0.26.2-x86_64-unknown-linux-musl.tar.gz
+
+RUN curl -fsSLO "https://github.com/ducaale/xh/releases/download/${XH_VERSION}/${XH_TARBALL}" \
+    && echo "${XH_SHA256}  ${XH_TARBALL}" | sha256sum -c - \
+    && tar -xzf "${XH_TARBALL}" -C /out --strip-components=1 \
+    --wildcards '*/xh' \
+    && /out/xh --version
+
 # ---------------------------------------------------------------------------
 # Homebrew payload.
 #
@@ -179,6 +198,7 @@ RUN --mount=type=bind,from=akmods,src=/rpms,dst=/tmp/akmods/rpms \
 
 COPY --from=fetch /out/starship /usr/bin/starship
 COPY --from=fetch /out/mise /usr/bin/mise
+COPY --from=fetch /out/xh /usr/bin/xh
 COPY --from=brew /homebrew.tar.zst /usr/share/homebrew.tar.zst
 COPY --from=quickshell /out/ /
 

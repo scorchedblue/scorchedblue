@@ -85,19 +85,29 @@ Four layers, chosen by property rather than taste:
 image. GUI app -> Flatpak. Drags a language runtime or heavy deps -> container.
 Otherwise -> Homebrew. Language runtimes themselves belong to `mise`.
 
-The image tier is deliberately small and each entry earns its place: `chezmoi`
-(it bootstraps everything else, so it cannot live in a user-space manager),
-`neovim` (`$EDITOR`, needed for `sudoedit` and for repairing a broken session),
-`git-delta` (the configured git pager -- absent, `sudo git` fails confusingly),
-plus `ripgrep` and `fd-find`.
+Two things earn a place in the image:
 
-`gh`, `just` and `mise` are admitted on a **second, narrower gate**: they are
-the tooling this system is worked on with. A machine that cannot run `just ci`,
-reach its own repositories, or resolve a pinned toolchain until Homebrew has
-finished provisioning cannot bootstrap or repair itself -- and first boot is
-exactly when that matters. The gate admits tools needed to *work on* the
-system, not tools that are pleasant to have while working on it. `git` needs no
-entry: `git-core` comes from the base and provides `/usr/bin/git`.
+- **Work surface** -- it defines ScorchedBlue as a terminal-first workstation.
+  `ripgrep`, `fd-find`, `bat`, `eza`, `xh`, `git-delta`, `gh`, `just`, `mise`,
+  `starship`. The terminal environment *is* the product here; shipping it empty
+  and making you provision it would contradict the whole point.
+- **Recoverability** -- it must work before login, as root, or on a broken
+  system. `chezmoi` (it bootstraps everything else, so it cannot live in a
+  user-space manager), `neovim` (`$EDITOR`, needed for `sudoedit` and for
+  repairing a broken session), `git-delta` (the configured git pager -- absent,
+  `sudo git` fails confusingly).
+
+**The admission test** is what keeps the first line honest: a single binary with
+no runtime stack behind it, either packaged by Fedora or worth vendoring. It is
+checkable, where "I use it a lot" is not. `httpie` fails it and `xh` replaces
+it.
+
+`git` needs no entry -- `git-core` comes from the base and provides
+`/usr/bin/git`. Nor do `jq`, `tree`, `lsof`, `ss`, `less`, `tar`, `zstd`,
+`curl` or `rsync`, all of which the base already carries.
+
+**Homebrew is not the cheap tier, it is yours.** The image ships what
+ScorchedBlue is; Homebrew carries what you add on top.
 
 ## Things that will bite
 

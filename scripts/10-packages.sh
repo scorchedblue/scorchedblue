@@ -63,7 +63,8 @@ dnf5 -y install --setopt=install_weak_deps=False \
     wl-clipboard \
     inotify-tools \
     gh \
-    just
+    bat \
+    eza
 
 ### git is already here ------------------------------------------------------
 # Not listed above because `git-core` comes from the base and provides
@@ -71,28 +72,55 @@ dnf5 -y install --setopt=install_weak_deps=False \
 # tooling, none of which this image has a use for. `just test` asserts the
 # binary rather than a package name, so this stays correct either way.
 
-### Why gh and just are in the image ----------------------------------------
-# They fail the "works before login, as root, or on a broken system" test that
-# governs the rest of this list, so they are here on a second, narrower
-# argument: this is a terminal-first workstation whose own tooling is driven by
-# `just`, and whose repositories are driven by `gh`. A machine that cannot run
-# `just ci` until Homebrew has finished provisioning cannot repair itself, and
-# first-boot provisioning is exactly when a machine is most likely to need it.
+### Why this list is what it is ----------------------------------------------
+# Two things earn a place in the image, and the list above is both of them
+# mixed together:
 #
-# Both are single static-ish binaries packaged by Fedora, with no runtime stack
-# behind them -- the property that keeps httpie out, below, does not apply.
-# just-1.57.0 also matches the version mise pins for the repositories, so the
-# image and a checkout agree by construction.
+#   WORK SURFACE   -- it defines ScorchedBlue as a terminal-first workstation.
+#                     rg, fd, bat, eza, delta, gh, just (and mise, xh, starship,
+#                     vendored in the Containerfile). The terminal environment
+#                     IS the product here; shipping it empty and making the user
+#                     provision it contradicts the whole point.
+#   RECOVERABILITY -- it must work before login, as root, or on a broken
+#                     system. neovim, chezmoi, git, delta.
+#
+# delta appears in both, which is fine: the pager makes `sudo git` behave, and
+# it is also what reading a diff should look like here.
+#
+# THE ADMISSION TEST, which is what keeps the first line from swallowing
+# everything: a single binary with no runtime stack behind it, either packaged
+# by Fedora or worth vendoring. That is checkable. "I use it a lot" is not, and
+# is how an image tier stops meaning anything.
+#
+### Already in the base: do NOT add these -----------------------------------
+# The base image already provides:
+#
+#   git (via git-core)  just  jq  ss  tree  lsof  less  tar  zstd  curl  rsync
+#
+# `just` is the surprising one and worth stating plainly: uBlue's `ujust` is a
+# just wrapper, so the base carries just-1.57.0 -- which is exactly the version
+# mise pins for these repositories. The image and a checkout therefore agree by
+# construction, and adding `just` to the list above would be a no-op.
+#
+# Worth stating because several are things a checklist would otherwise reach
+# for. Adding them explicitly is a no-op that makes the delta look larger than
+# it is, and `just diff` exists to show what this image actually adds.
 
-### Leaf tools: NOT here --------------------------------------------------
-# httpie, zoxide, bat, tealdeer and the rest of the interactive long tail
-# belong to the Homebrew tier, provisioned by scorched-brew-setup.service and
-# installed from a Brewfile that scorched-desktop manages via chezmoi.
+### Homebrew: yours, not the product's --------------------------------------
+# zoxide, tealdeer and the rest of the personal long tail belong to the
+# Homebrew tier, provisioned by scorched-brew-setup.service and installed from
+# a Brewfile that scorched-desktop manages via chezmoi.
 #
-# Keeping them out of the image is not just tidiness: `httpie` as an RPM drags
-# python3-pip, python3-pygments and python3-requests into /usr, which is exactly
-# the "heavy dependency stack" the placement policy sends elsewhere. Homebrew's
-# build is self-contained.
+# The split is not "cheap tier / expensive tier". It is: the image ships what
+# ScorchedBlue *is*, and Homebrew carries what a particular person adds on top.
+# That is the right line for an image other people install.
+#
+# It is also where anything failing the admission test goes. `httpie` is the
+# example worth keeping: as an RPM it drags python3-pip, python3-pygments and
+# python3-requests into /usr, which is a runtime stack, so it cannot be part of
+# the work surface however much someone likes it. `xh` replaced it and is a
+# single static musl binary, which is precisely why xh is vendored above and
+# httpie is not here.
 
 # Clean in this layer: a later `rm` would hide the cache without reclaiming it.
 dnf5 clean all

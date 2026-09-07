@@ -185,17 +185,23 @@ test: build
     # The image must carry no identity -- no auth key, no node state.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '[ ! -e /var/lib/tailscale/tailscaled.state ] && echo "tailscale carries no identity: ok"'
-    # The project's own tooling, admitted on the second placement gate. These
-    # must be reachable before Homebrew has provisioned anything, because first
-    # boot is exactly when a machine needs to be able to repair itself.
+    # The work surface. These define the image as a terminal-first workstation,
+    # so they must be present before Homebrew has provisioned anything -- a user
+    # who has to wait for brew to get `rg` has not been handed the product.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'command -v git >/dev/null && command -v gh >/dev/null \
-         && command -v just >/dev/null && command -v mise >/dev/null \
-         && echo "project tooling: ok"'
-    # mise is vendored, not packaged -- assert it actually runs. A binary built
-    # against the wrong libc would be present and non-functional, and nothing
-    # else here would notice.
+        'for b in git gh just mise xh bat eza rg fd delta starship; do \
+             command -v "$b" >/dev/null || { echo "missing: $b" >&2; exit 1; }; \
+         done; echo "work surface: ok"'
+    # mise and xh are vendored, not packaged -- assert they actually run. A
+    # binary built against the wrong libc would be present and non-functional,
+    # and a `command -v` check would not notice.
     podman run --rm {{ image }}:{{ tag }} mise --version
+    podman run --rm {{ image }}:{{ tag }} xh --version
+    # httpie must stay out: it drags a python runtime stack into /usr, which is
+    # what the admission test exists to exclude. xh is its replacement.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        '! rpm -q httpie >/dev/null 2>&1 && ! command -v http >/dev/null \
+         && echo "no python http stack: ok"'
     # just in the image must match what mise pins for the repositories, or a
     # machine and a checkout can disagree about the same recipe.
     podman run --rm {{ image }}:{{ tag }} bash -c \

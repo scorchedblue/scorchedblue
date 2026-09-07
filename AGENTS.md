@@ -117,21 +117,36 @@ without re-arguing them.
 
 ## Software placement
 
-Needs to work before login, as root, or on a broken system → **image**. GUI app
-→ **Flatpak**. Drags a language runtime or heavy deps → **container**.
-Otherwise → **Homebrew**. Language runtimes belong to **mise**.
+Two things earn a place in the **image**:
 
-**The second gate: the project's own tooling.** `gh`, `just` and `mise` are in
-the image despite failing the test above. A terminal-first workstation whose
-tooling is driven by `just`, whose repositories are driven by `gh`, and whose
-toolchains are pinned by `mise` cannot bootstrap or repair itself if all three
-wait on Homebrew provisioning. This gate is narrow on purpose: it admits the
-tools needed to *work on this system*, not the tools that are pleasant to have
-while working on it. `httpie`, `bat` and `zoxide` still go to Homebrew.
+- **Work surface** — it defines ScorchedBlue as a terminal-first workstation.
+  The terminal environment *is* the product; shipping it empty and making the
+  user provision it contradicts the thesis. `rg`, `fd`, `bat`, `eza`, `xh`,
+  `delta`, `gh`, `just`, `mise`, `starship`, and the terminal, shell,
+  multiplexer and prompt that P2 adds.
+- **Recoverability** — it must work before login, as root, or on a broken
+  system. `neovim`, `chezmoi`, `git`, `delta`.
 
-All three are single binaries with no runtime stack behind them. That property
-is doing real work here -- it is the reason `httpie`, which drags python3-pip
-and python3-requests into `/usr`, is not admitted by the same argument.
+Then: GUI app → **Flatpak**. Drags a language runtime or heavy deps →
+**container**. A personal addition on top of the work surface → **Homebrew**.
+Language runtimes belong to **mise**.
+
+**The admission test**, which is what stops the work-surface line swallowing
+everything: *a single binary with no runtime stack behind it, either packaged by
+Fedora or worth vendoring.* That is checkable. "I use it a lot" is not, and is
+how an image tier stops meaning anything. `httpie` fails it — as an RPM it drags
+python3-pip and python3-requests into `/usr` — which is exactly why `xh`
+replaced it and is vendored.
+
+**Homebrew is not the cheap tier, it is *your* tier.** The image ships what
+ScorchedBlue is; Homebrew carries what a particular person adds. That is the
+right split for an image other people install.
+
+This supersedes an earlier rule that read "needs to work before login, as root,
+or on a broken system → image" and nothing more. That rule never described the
+actual list — `ripgrep` and `fd-find` were already in the image under it with no
+justification offered — and it would have excluded the terminal environment,
+which is the one thing this project is *for*.
 
 Homebrew cannot be baked into the image: `/home` is a symlink to `var/home`, so
 an installed brew lives in `/var`. The image ships the payload; the systemd unit
