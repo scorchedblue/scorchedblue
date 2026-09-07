@@ -1,0 +1,4 @@
+# Build output
+/output
+/*.qcow2
+/*.iso

@@ -1,0 +1,22 @@
+# greetd, configured to launch tuigreet against the installed Wayland sessions.
+#
+# Without this file greetd runs its stock `agreety --cmd /bin/sh`: a text
+# greeter that prints /etc/issue and drops to a shell. That looks almost
+# exactly like a getty login prompt, which makes "the greeter is unconfigured"
+# and "the display manager never started" indistinguishable on a screenshot.
+#
+# vt = 1 is greetd's own default and is safe: greetd.service already declares
+# Conflicts=getty@tty1.service, so systemd stops the getty rather than the two
+# fighting over the console.
+
+[terminal]
+vt = 1
+
+[default_session]
+# A single path with no arguments, deliberately. greetd's man page documents
+# `command` only as "the command-line" and does not say how it is split; the
+# greeter's arguments include values containing spaces, and this is the one
+# process where a bad split means nobody can log in. Everything about how the
+# greeter looks and behaves lives in that script instead.
+command = "/usr/libexec/scorched-greeter"
+user = "greetd"

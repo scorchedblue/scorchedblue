@@ -1,0 +1,36 @@
+# The session target Hyprland does not ship.
+#
+# xdg-desktop-portal.service declares Requisite=graphical-session.target, and
+# xdg-desktop-portal-hyprland.service is PartOf= it. That target sets
+# RefuseManualStart=yes, so it can only ever be reached as a dependency of
+# something else -- never started directly.
+#
+# Under GNOME, gnome-session brought it up. Hyprland does not: it imports
+# WAYLAND_DISPLAY and friends into the systemd user manager, but starts no
+# target. So on a Hyprland session every portal request fails with
+#
+#   Could not activate remote peer 'org.freedesktop.portal.Desktop':
+#   startup job failed
+#
+# and nothing works that needs a portal -- screen sharing above all, which is
+# the capability this whole session exists for. Nothing logs an error until
+# something asks for a portal, so the session looks entirely healthy.
+#
+# Upstream's answer is uwsm, which the hyprland RPM assumes: it ships
+# /usr/share/wayland-sessions/hyprland-uwsm.desktop. uwsm is packaged neither
+# in Fedora nor in the Hyprland COPR this image builds from, so that session
+# entry points at a binary nothing provides. This target is the same job done
+# without it.
+#
+# BindsTo implies Requires, which is what pulls graphical-session.target up,
+# and means it comes back down with the session rather than lingering.
+#
+# Started from the Hyprland config's "hyprland.start" handler; see
+# scorched-desktop.
+
+[Unit]
+Description=Hyprland session
+Documentation=man:systemd.special(7)
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target

@@ -1,0 +1,96 @@
+// ScorchedBlue -- system default fastfetch configuration.
+//
+// /etc/fastfetch/ is one of two paths fastfetch searches for a system config
+// (`fastfetch --list-config-paths`); the other is /etc/xdg/fastfetch/. A user
+// file at ~/.config/fastfetch/config.jsonc wins over this one, so this sets the
+// default without taking the choice away.
+//
+// Why this is in the image at all, when the placement policy sends leaf tools
+// to Homebrew: fastfetch answers "what am I actually running" -- image ref,
+// digest, kernel, driver -- and that is a question asked in a rescue shell,
+// before login, on a machine that is already misbehaving. Homebrew is not
+// provisioned then. Same argument ripgrep and fd-find already carry.
+//
+// The OS module deliberately still reports Fedora. That is the truth: this is
+// Fedora 44 with our layers on top, and rewriting /etc/os-release to claim
+// otherwise would break every downstream tool that parses it to identify the
+// base. ScorchedBlue identity comes from the logo and the Image/Digest rows.
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+
+    // Pure ASCII, no Unicode block characters. A logo is the first thing drawn
+    // on a console that may have nothing but the base font -- a VT during a
+    // failed boot, which is exactly when this tool earns its place.
+    "logo": {
+        "type": "file",
+        "source": "/usr/share/fastfetch/logos/scorchedblue.txt",
+        "color": {
+            "1": "blue",
+            "2": "cyan"
+        },
+        "padding": {
+            "top": 1,
+            "right": 3
+        }
+    },
+
+    "display": {
+        "separator": "  "
+    },
+
+    "modules": [
+        "break",
+        "title",
+        "separator",
+
+        // --- identity ---------------------------------------------------
+        // rpm-ostree, not bootc. `bootc status` requires root ("This command
+        // must be executed as the root user") in every output format, so a
+        // fastfetch run as a normal user would print an error where the image
+        // ref should be. rpm-ostree reads the same deployment data unprivileged.
+        //
+        // The reference is prefixed by its transport --
+        // "ostree-unverified-image:containers-storage:" for a local build,
+        // "ostree-image-signed:docker://" for a pulled one. Neither is
+        // interesting on screen, so both are trimmed to the bare ref.
+        {
+            "type": "command",
+            "key": "Image",
+            "text": "rpm-ostree status --booted --json 2>/dev/null | jq -r '.deployments[0].\"container-image-reference\" // empty' | sed -E 's/^[^:]*:(containers-storage:|docker:\\/\\/)?//' || true"
+        },
+        {
+            "type": "command",
+            "key": "Digest",
+            "text": "rpm-ostree status --booted --json 2>/dev/null | jq -r '.deployments[0].\"base-commit-meta\".\"ostree.manifest-digest\" // empty' | cut -c1-19 || true"
+        },
+        "os",
+        "kernel",
+        "uptime",
+        "packages",
+
+        "break",
+
+        // --- session ----------------------------------------------------
+        "de",
+        "wm",
+        "shell",
+        "terminal",
+        "display",
+
+        "break",
+
+        // --- hardware ---------------------------------------------------
+        // GPU matters more here than on a generic image: this ships the NVIDIA
+        // userspace stack, and "which driver actually bound" is the first
+        // question when the session will not start.
+        "cpu",
+        "gpu",
+        "memory",
+        "swap",
+        "disk",
+        "localip",
+
+        "break",
+        "colors"
+    ]
+}

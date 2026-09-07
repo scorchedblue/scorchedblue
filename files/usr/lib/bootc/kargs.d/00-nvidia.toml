@@ -1,0 +1,34 @@
+# Kernel arguments the NVIDIA driver cannot work without.
+#
+# These do not come from any RPM. On uBlue's own NVIDIA images the file is
+# written by the image build, not shipped by ublue-os-nvidia-addons -- so an
+# image that installs the akmods RPMs itself, as this one does, gets the driver
+# and the userspace but none of the boot-time configuration that lets the driver
+# reach the GPU. Nothing fails at build time; the image is perfectly valid. It
+# simply boots to a black screen.
+#
+# What happens without them: nouveau is built into the kernel and loads from the
+# initrd, binds the GPU first, and calls vgaarb to tear down the VGA console.
+# nvidia.ko then loads and refuses to attach -- "GPU is already bound to
+# nouveau", "No NVIDIA devices probed". There is no DRM device for the
+# compositor and no usable console for the VTs, so both the greeter and
+# Ctrl+Alt+F2..F6 come up blank. The machine is running fine and answering the
+# network; it just cannot draw anything.
+#
+# modprobe.blacklist alone is not enough. /usr/lib/modprobe.d/nvidia.conf
+# already blacklists nouveau for the real root, but the initrd has its own
+# module policy -- hence rd.driver.blacklist, which is the one that actually
+# keeps nouveau off the card.
+#
+#   rd.driver.blacklist  keep nouveau out of the initrd, where it would
+#                        otherwise claim the GPU before nvidia.ko exists
+#   modprobe.blacklist   keep it out of the real root too
+#   nvidia-drm.modeset   required for Wayland; without KMS there is no
+#                        DRM master for Hyprland to take
+#   initcall_blacklist   stop simpledrm claiming the framebuffer first, which
+#                        leaves the console owned by a driver that is about to
+#                        be replaced
+#
+# The values are exactly those the base's NVIDIA images boot with. Deviating
+# here is not a tuning exercise -- it is how the screen stays dark.
+kargs = ["rd.driver.blacklist=nouveau", "modprobe.blacklist=nouveau", "nvidia-drm.modeset=1", "initcall_blacklist=simpledrm_platform_driver_init"]

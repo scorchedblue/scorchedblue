@@ -1,0 +1,54 @@
+#!/usr/bin/bash
+#
+# The greeter, and everything about how it looks.
+#
+# This exists so that greetd's `command` is a single path with no arguments.
+# greetd's man page documents `command` only as "the command-line" without
+# specifying how it is split, and the greeter is the one process where getting
+# that wrong means nobody can log in. Several arguments below contain spaces --
+# the time format and the greeting -- and a naive split would shatter them into
+# stray positional arguments. Putting them here removes the question entirely,
+# and has the side benefit that this file can be linted and read on its own.
+#
+# Appearance lives in the image rather than in scorched-desktop, and it is the
+# one exception to that split: scorched-desktop is deployed into $HOME by
+# chezmoi, and the greeter runs as the `greetd` user before any user session
+# exists. It has no $HOME to read from.
+
+set -euo pipefail
+
+# Colours are ANSI names because that is all --theme accepts; they cannot be the
+# shell's hex values. These are the nearest equivalents to the bar's palette:
+# blue for the accent, cyan for the clock, grey for de-emphasised hints.
+#
+# Invalid entries are ignored silently rather than rejected. That cuts both
+# ways: a typo here cannot lock anyone out, and it will not announce itself
+# either. Components and colour names are documented in
+# /usr/share/doc/tuigreet/README.md.
+theme='border=blue'
+theme+=';title=lightblue'
+theme+=';greet=lightblue'
+theme+=';text=white'
+theme+=';time=cyan'
+theme+=';prompt=white'
+theme+=';input=lightcyan'
+theme+=';action=gray'
+theme+=';button=lightblue'
+theme+=';container=black'
+
+# --asterisks: without it a typed password gives no feedback whatsoever, which
+#   reads as a frozen greeter. The biggest usability difference on this screen.
+# --time-format: matches the bar's clock, so the same moment is written the same
+#   way before and after login.
+# --sessions: read the list from what is actually installed rather than
+#   hardcoding a command, so a new session file is picked up for free.
+exec /usr/bin/tuigreet \
+    --remember \
+    --remember-session \
+    --asterisks \
+    --time \
+    --time-format '%a %-d %b   %I:%M %p' \
+    --greeting 'ScorchedBlue' \
+    --window-padding 2 \
+    --theme "$theme" \
+    --sessions /usr/share/wayland-sessions

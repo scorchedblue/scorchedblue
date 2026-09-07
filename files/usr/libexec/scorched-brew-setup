@@ -1,0 +1,37 @@
+#!/usr/bin/bash
+# Materialise Homebrew into /var on first boot.
+#
+# /home is a symlink to var/home, so /home/linuxbrew lives in /var -- deployment
+# state, not the image's immutable /usr. An image therefore cannot *contain* an
+# installed brew; it can only ship the payload and this mechanism to unpack it.
+set -euo pipefail
+
+payload=/usr/share/homebrew.tar.zst
+target=/home/linuxbrew
+
+[ -f "${payload}" ] || {
+    echo "no brew payload at ${payload}" >&2
+    exit 1
+}
+[ -d "${target}/.linuxbrew" ] && {
+    echo "brew already present"
+    exit 0
+}
+
+# Deriving the owner rather than hardcoding 1000:1000: a fixed UID is correct
+# on a single-user machine and silently wrong otherwise. Falls back to 1000 only
+# when no human account exists yet, which is the case on first boot.
+uid="$(awk -F: '$3>=1000 && $3<65534 {print $3; exit}' /etc/passwd)"
+uid="${uid:-1000}"
+gid="$(awk -F: -v u="${uid}" '$3==u {print $4; exit}' /etc/passwd)"
+gid="${gid:-${uid}}"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "${tmp}"' EXIT
+
+tar --zstd -xf "${payload}" -C "${tmp}"
+mkdir -p "${target}"
+cp -R -n "${tmp}/home/linuxbrew/.linuxbrew" "${target}/"
+chown -R "${uid}:${gid}" "${target}"
+
+echo "brew provisioned to ${target} for ${uid}:${gid}"

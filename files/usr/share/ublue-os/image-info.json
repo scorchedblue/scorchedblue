@@ -1,0 +1,9 @@
+{
+  "image-name": "scorchedblue",
+  "image-flavor": "nvidia-open",
+  "image-vendor": "scorchedblue",
+  "image-ref": "docker://ghcr.io/scorchedblue/scorchedblue",
+  "image-tag": "latest",
+  "base-image-name": "base-main",
+  "fedora-version": "44"
+}

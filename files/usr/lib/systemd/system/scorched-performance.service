@@ -1,0 +1,17 @@
+[Unit]
+Description=Set every CPU to performance mode
+# Nothing to do on a machine with no cpufreq interface, which is the normal
+# situation inside a VM. Without this the unit would run and report nothing.
+ConditionPathIsDirectory=/sys/devices/system/cpu/cpu0/cpufreq
+Wants=basic.target
+After=basic.target
+
+[Service]
+Type=oneshot
+# RemainAfterExit so `systemctl status` shows the setting as applied rather than
+# as a process that exited, and so the unit reads as state rather than an event.
+RemainAfterExit=yes
+ExecStart=/usr/libexec/scorched-performance
+
+[Install]
+WantedBy=multi-user.target

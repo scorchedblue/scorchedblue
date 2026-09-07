@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The base image rebuilds daily; catch base/akmods kernel drift before it
+  # reaches a machine rather than after.
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    # mise resolves tool versions through the aqua backend, which calls the
+    # GitHub releases API. Unauthenticated it hits the shared rate limit and
+    # fails with 403. mise-action sets MISE_GITHUB_TOKEN, but aqua reads
+    # GITHUB_TOKEN, so it has to be exported explicitly.
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # mise's aqua backend is rate-limited by the GitHub API even with a valid
+      # token (jdx/mise#5418), and trivy is the request that trips it -- just,
+      # shellcheck and shfmt resolve first and succeed. Skip it here and install
+      # it from Aqua's own action below. mise.toml stays the version source of
+      # truth, so local and CI cannot drift.
+      MISE_DISABLE_TOOLS: trivy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The built image is ~10GB uncompressed and the base another ~7.5GB, so a
+      # stock runner's free space is not enough. These are the large
+      # preinstalled toolchains we never use; between them they free ~25GB.
+      # The df output is kept so a future disk failure is diagnosable rather
+      # than mysterious.
+      - name: Reclaim runner disk
+        run: |
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h /
+
+      # podman is preinstalled on GitHub's ubuntu runners; assert it rather than
+      # discover its absence halfway through a 10GB build.
+      - name: Verify build tooling
+        run: podman --version
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.1.0
+
+      # Version comes from mise.toml so there is exactly one place to bump it.
+      - name: Read the pinned trivy version
+        id: trivy
+        run: echo "version=$(grep -oP '(?<=^trivy = \")[^\"]+' mise.toml)" >> "$GITHUB_OUTPUT"
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v${{ steps.trivy.outputs.version }}
+
+      # The same recipe developers run locally, so CI cannot drift from it.
+      - run: just ci

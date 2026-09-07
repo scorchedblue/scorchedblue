@@ -1,0 +1,16 @@
+[Unit]
+Description=Provision Homebrew into /var on first boot
+Wants=basic.target
+After=basic.target
+# Idempotence: skip entirely once brew exists, and do nothing if the image was
+# built without the payload.
+ConditionPathExists=!/home/linuxbrew/.linuxbrew
+ConditionPathExists=/usr/share/homebrew.tar.zst
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/scorched-brew-setup
+
+[Install]
+WantedBy=default.target multi-user.target

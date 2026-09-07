@@ -1,0 +1,66 @@
+#!/usr/bin/bash
+#
+# Put every CPU into its performance mode at boot.
+#
+# ScorchedBlue targets desktops. There is no battery to preserve, so the kernel's
+# default of trading latency for power is the wrong trade here every time.
+#
+# Two knobs, not one. On intel_pstate in active mode -- the common case on a
+# modern Intel desktop -- the scaling governor is only half the story: the
+# hardware also takes an energy/performance hint, and leaving that at
+# balance_performance holds clocks back even with the governor set to
+# performance. A machine "set to performance" with EPP still balanced is the
+# usual reason this change appears to do nothing.
+#
+# Deliberately tolerant. Not every machine has cpufreq at all (a VM often does
+# not), drivers expose different governor sets, and amd-pstate and acpi-cpufreq
+# name things differently. Anything absent is skipped rather than failed on:
+# the unit must not go red on hardware that simply has fewer knobs.
+
+set -uo pipefail
+
+wrote_governor=0
+wrote_epp=0
+cpus=0
+
+for dir in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+    [ -d "$dir" ] || continue
+    cpus=$((cpus + 1))
+
+    # Only write a governor the driver actually offers. Writing an unsupported
+    # value returns EINVAL, and with `set -e` that would take the whole unit
+    # down over one core.
+    if [ -f "$dir/scaling_governor" ] &&
+        grep -qw performance "$dir/scaling_available_governors" 2>/dev/null; then
+        if echo performance >"$dir/scaling_governor" 2>/dev/null; then
+            wrote_governor=$((wrote_governor + 1))
+        fi
+    fi
+
+    # The energy/performance preference, where the driver exposes one.
+    if [ -f "$dir/energy_performance_preference" ] &&
+        grep -qw performance "$dir/energy_performance_available_preferences" 2>/dev/null; then
+        if echo performance >"$dir/energy_performance_preference" 2>/dev/null; then
+            wrote_epp=$((wrote_epp + 1))
+        fi
+    fi
+done
+
+if [ "$cpus" -eq 0 ]; then
+    echo "no cpufreq interface present; nothing to do"
+    exit 0
+fi
+
+# Turbo is normally already enabled; assert rather than assume, since a
+# firmware or a previous boot could have disabled it.
+if [ -f /sys/devices/system/cpu/intel_pstate/no_turbo ]; then
+    echo 0 >/sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+fi
+
+echo "cpufreq: ${cpus} policies, governor set on ${wrote_governor}, EPP set on ${wrote_epp}"
+
+# Report what actually took, not what was attempted. This line is the whole
+# reason to read `systemctl status scorched-performance`.
+gov="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo '?')"
+epp="$(cat /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference 2>/dev/null || echo 'n/a')"
+echo "cpu0 now: governor=${gov} epp=${epp}"
