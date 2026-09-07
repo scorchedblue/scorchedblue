@@ -189,9 +189,14 @@ test: build
     # so they must be present before Homebrew has provisioned anything -- a user
     # who has to wait for brew to get `rg` has not been handed the product.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'for b in git gh just mise xh bat eza rg fd delta starship; do \
+        'for b in git gh just mise xh bat eza rg fd delta starship jq yq vim wget; do \
              command -v "$b" >/dev/null || { echo "missing: $b" >&2; exit 1; }; \
          done; echo "work surface: ok"'
+    # yq must be mikefarah/yq. The unrelated kislyuk/yq of the same name is a
+    # Python wrapper around jq, and a swap would be invisible to `command -v`
+    # while quietly putting a runtime stack in /usr.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'yq --version | grep -q mikefarah && echo "yq is the Go implementation: ok"'
     # mise and xh are vendored, not packaged -- assert they actually run. A
     # binary built against the wrong libc would be present and non-functional,
     # and a `command -v` check would not notice.

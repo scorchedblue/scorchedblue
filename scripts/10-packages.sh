@@ -64,7 +64,8 @@ dnf5 -y install --setopt=install_weak_deps=False \
     inotify-tools \
     gh \
     bat \
-    eza
+    eza \
+    yq
 
 ### git is already here ------------------------------------------------------
 # Not listed above because `git-core` comes from the base and provides
@@ -92,10 +93,27 @@ dnf5 -y install --setopt=install_weak_deps=False \
 # by Fedora or worth vendoring. That is checkable. "I use it a lot" is not, and
 # is how an image tier stops meaning anything.
 #
+### yq is the Go one -------------------------------------------------------
+# Fedora's `yq` is mikefarah/yq: a single static Go binary, 5MiB, no
+# dependencies. Worth stating because there is a second, unrelated project of
+# the same name -- kislyuk/yq -- which is a Python wrapper around jq. That one
+# would drag a runtime stack into /usr and fails the admission test outright.
+# If `yq --version` ever stops reporting mikefarah's, something has been
+# swapped underneath us.
+
 ### Already in the base: do NOT add these -----------------------------------
 # The base image already provides:
 #
-#   git (via git-core)  just  jq  ss  tree  lsof  less  tar  zstd  curl  rsync
+#   git (via git-core)  just  jq  ss  tree  lsof  less  tar  zstd
+#   curl  rsync  vim  wget
+#
+# `vim` is vim-enhanced, not the minimal build, so it is a real vim and not
+# just a `vi` stub. neovim is still installed alongside it as $EDITOR.
+#
+# `wget` is provided by wget2-wget: the command exists, but it is GNU Wget2,
+# not classic wget. Behaviour differs in places (notably --mirror and some
+# retry semantics), so a script written against wget 1.x should be checked
+# rather than assumed to work.
 #
 # `just` is the surprising one and worth stating plainly: uBlue's `ujust` is a
 # just wrapper, so the base carries just-1.57.0 -- which is exactly the version
