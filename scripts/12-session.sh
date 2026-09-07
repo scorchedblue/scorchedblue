@@ -48,8 +48,6 @@ esac
 #
 #   greetd + tuigreet   display manager; tuigreet is a console greeter, which
 #                       suits a keyboard-driven session
-#   foot                terminal. Wayland-native and small. ghostty is not
-#                       packaged by Fedora
 #   swaylock            lockscreen. Deliberately NOT hand-rolled: a bug in an
 #                       ext-session-lock-v1 implementation is a bypassable lock
 #   swayidle/swaybg     idle handling and wallpaper
@@ -67,7 +65,6 @@ esac
 dnf5 -y install --setopt=install_weak_deps=False \
     greetd \
     tuigreet \
-    foot \
     swaylock \
     swayidle \
     swaybg \
