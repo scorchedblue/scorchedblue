@@ -34,6 +34,13 @@ build:
 test: build
     #!/usr/bin/bash
     set -euxo pipefail
+    # Pin the image this run is verifying. `test` depends on `build`, so every
+    # invocation re-tags -- and anything else that builds concurrently moves the
+    # tag out from under these assertions. Without the check at the end of this
+    # recipe, "the image I verified" and "the image under the tag" can differ
+    # and nothing says so. Compare IDs, exactly as `just vm` does, and for the
+    # same reason: a substitution under the same tag is otherwise silent.
+    verified="$(podman image inspect {{ image }}:{{ tag }} --format '{{{{.Id}}}}')"
     # bootc must consider this a valid bootable container.
     podman run --rm {{ image }}:{{ tag }} bootc container lint
     # The NVIDIA userspace must be present, not just the kernel module -- a kmod
@@ -248,6 +255,16 @@ test: build
     # The payload must actually contain a runnable brew, not just unpack cleanly.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'tar --zstd -tf /usr/share/homebrew.tar.zst | grep -q "^home/linuxbrew/.linuxbrew/bin/brew$" && echo "brew payload: ok"'
+    # Last, because a pass means nothing if the tag no longer names the image
+    # that passed. Anything else building concurrently moves it, and the next
+    # command someone runs against the tag -- `podman save`, `just vm`, a rebase
+    # -- would then use an image nothing verified.
+    current="$(podman image inspect {{ image }}:{{ tag }} --format '{{{{.Id}}}}')"
+    [ "$current" = "$verified" ] || {
+        echo "{{ image }}:{{ tag }} moved during this run: verified ${verified}, tag now ${current}" >&2
+        exit 1
+    }
+    echo "verified image: ${verified}"
 
 # Vulnerability scan.
 #
