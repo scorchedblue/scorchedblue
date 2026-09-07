@@ -106,6 +106,15 @@ test: build
     # vanish silently -- assert the file landed.
     podman run --rm {{ image }}:{{ tag }} \
         test -f /usr/share/fastfetch/logos/scorchedblue.txt
+    # tmux ships from the base with no /etc/tmux.conf of its own, so a syntax
+    # error in ours would go unnoticed until someone opens a session -- `tmux
+    # new-session -d` swallows a bad config line silently because there is no
+    # attached client to report it to. -C (control mode) attaches one from the
+    # start, so a bad line surfaces as a `%config-error` line on stdout.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'test -f /etc/tmux.conf \
+         && ! (echo | timeout 2 tmux -f /etc/tmux.conf -C new-session -d -s t 2>&1 | grep -q "%config-error") \
+         && echo "tmux config: ok"'
     # base-nvidia must not have dragged in a desktop environment.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '! rpm -q gnome-shell gdm mutter >/dev/null 2>&1 && echo "no inherited desktop: ok"'
