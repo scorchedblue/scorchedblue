@@ -1,11 +1,16 @@
 # Kernel arguments the NVIDIA driver cannot work without.
 #
-# These do not come from any RPM. On uBlue's own NVIDIA images the file is
-# written by the image build, not shipped by ublue-os-nvidia-addons -- so an
-# image that installs the akmods RPMs itself, as this one does, gets the driver
-# and the userspace but none of the boot-time configuration that lets the driver
-# reach the GPU. Nothing fails at build time; the image is perfectly valid. It
-# simply boots to a black screen.
+# These come from no RPM and, despite what is widely assumed, from no base
+# either. Moving to base-nvidia was expected to retire this file; it does not.
+# `ls /usr/lib/bootc/kargs.d/` in ghcr.io/ublue-os/base-nvidia:44 is empty, and
+# byte-for-byte identical to base-main's -- ublue-os-nvidia-addons ships repo
+# files, a preset and a SELinux module, and nothing that touches boot. The
+# driver, the userspace and the i686 stack are inherited; the boot-time
+# configuration that lets the driver reach the GPU still has to be written here.
+#
+# Nothing fails at build time when it is missing; the image is perfectly valid.
+# It simply boots to a black screen. Re-check the base before deleting this
+# file, and delete it only against a listing that shows the base writing it.
 #
 # What happens without them: nouveau is built into the kernel and loads from the
 # initrd, binds the GPU first, and calls vgaarb to tear down the VGA console.
@@ -29,6 +34,6 @@
 #                        leaves the console owned by a driver that is about to
 #                        be replaced
 #
-# The values are exactly those the base's NVIDIA images boot with. Deviating
-# here is not a tuning exercise -- it is how the screen stays dark.
+# The values are exactly those uBlue's NVIDIA desktop images boot with.
+# Deviating here is not a tuning exercise -- it is how the screen stays dark.
 kargs = ["rd.driver.blacklist=nouveau", "modprobe.blacklist=nouveau", "nvidia-drm.modeset=1", "initcall_blacklist=simpledrm_platform_driver_init"]

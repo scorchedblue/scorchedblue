@@ -17,10 +17,11 @@ without re-arguing them.
 - **The base is pinned by digest, never a floating tag.** A base bump is an
   explicit, reviewable change to the `ARG`. That rule is not up for discussion;
   *which* base is, and has changed with the session each time.
-  **Currently `base-main`. Moving to `base-nvidia` is decided and sequenced** --
-  it writes `kargs.d` during its own build, which removes the trap below from
-  this repository. Until that lands, `base-main` plus in-house akmods is what
-  ships and what the assertions describe.
+  **Currently `base-nvidia`**, which is the only NVIDIA variant published --
+  `base-nvidia-open`, `base-main-nvidia` and `base-main-nvidia-open` do not
+  exist. The move off `base-main` plus in-house akmods was made to inherit the
+  driver in lockstep with the kernel. It did **not** remove the kargs trap
+  below: that expectation was wrong, and the file stays.
 - **Do not vendor or fork another project's shell.** The point is our opinions,
   not inherited ones. The cost -- that it will not resemble the demos until real
   design work happens -- is accepted.
@@ -56,19 +57,26 @@ without re-arguing them.
 
 ## NVIDIA
 
-- Consume uBlue's prebuilt `akmods-nvidia-open`. **Never build akmods locally.**
-- Install the **full userspace stack** (`/rpms/nvidia/*`), not just the kmod. A
-  kernel module alone gives no `nvidia-smi`, no GL and no session.
-- Keep the **i686** packages: 32-bit titles under Steam need 32-bit GL.
-- **Do not remove the kernel lockstep assertion** in `scripts/20-nvidia.sh`. If
-  base and akmods kernels diverge, the machine boots without a driver.
+- **The driver comes from the base. Never build or install akmods here.** The
+  open kmod (`nvidia.ko` reports `Dual MIT/GPL`), the full userspace and the
+  i686 packages are all inherited. A kernel module alone would give no
+  `nvidia-smi`, no GL and no session; the i686 half is what 32-bit titles under
+  Steam need for GL.
+- **Kernel lockstep is now structural, not asserted.** One image, one kernel, so
+  base and kmod cannot diverge the way they could when the akmods came from a
+  second image. `just test` checks that `nvidia.ko` exists for the shipped
+  kernel, which is all that remains of the old build-time assertion.
 - **Keep `files/usr/lib/bootc/kargs.d/00-nvidia.toml`.** No RPM ships these
-  kargs -- the base's NVIDIA images write the file during their own build, so
-  installing the akmods ourselves gets the driver and none of the boot-time
-  configuration. Without them nouveau claims the GPU from the initrd, `nvidia.ko`
-  cannot attach, and the machine boots to a black screen with dead VTs: a
-  perfectly valid image that cannot draw. Nothing fails at build time, which is
-  why `just test` asserts each karg by name.
+  kargs and **`base-nvidia` does not write them either** -- its
+  `/usr/lib/bootc/kargs.d` is empty, byte-identical to `base-main`'s, and
+  `ublue-os-nvidia-addons` ships repo files, a preset and a SELinux module and
+  nothing that touches boot. The widespread belief that an NVIDIA base supplies
+  them is the reason this bullet is worded this strongly. Without them nouveau
+  claims the GPU from the initrd, `nvidia.ko` cannot attach, and the machine
+  boots to a black screen with dead VTs: a perfectly valid image that cannot
+  draw. Nothing fails at build time, which is why `just test` asserts each karg
+  by name. Delete this file only against a listing of the base that shows it
+  writing them.
 
 ## The session
 

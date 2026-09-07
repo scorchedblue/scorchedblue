@@ -4,6 +4,6 @@
   "image-vendor": "scorchedblue",
   "image-ref": "docker://ghcr.io/scorchedblue/scorchedblue",
   "image-tag": "latest",
-  "base-image-name": "base-main",
+  "base-image-name": "base-nvidia",
   "fedora-version": "44"
 }
