@@ -250,6 +250,13 @@ test: build
     # phase and its whole Brewfile group -- a skip, not an error.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'jq -e "has(\"image-name\")" /usr/share/ublue-os/image-info.json >/dev/null && echo "image-info: ok"'
+    # base-image-name must agree with the base this image actually built from,
+    # or a bump that forgets this file ships a quiet inaccuracy -- exactly how
+    # it said "silverblue" for weeks after the base first moved.
+    base_name="$(basename "$(grep -oP '(?<=^ARG BASE_IMAGE=).*' Containerfile)")"
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        "jq -e '.\"base-image-name\" == \"$base_name\"' /usr/share/ublue-os/image-info.json >/dev/null" \
+        && echo "image-info base-image-name matches Containerfile: ok"
     # Homebrew payload and its first-boot unit.
     podman run --rm {{ image }}:{{ tag }} test -f /usr/share/homebrew.tar.zst
     podman run --rm {{ image }}:{{ tag }} test -x /usr/libexec/scorched-brew-setup
