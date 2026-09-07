@@ -22,7 +22,7 @@ image that was not chosen on purpose.
 | --- | --- |
 | Base | `ghcr.io/ublue-os/base-nvidia`, pinned by digest |
 | Session | Hyprland only, with a Quickshell shell written in-house |
-| Terminal today | `foot`; Ghostty is sequenced but not yet built |
+| Terminal | Ghostty, sequenced but not yet built; no fallback terminal is kept |
 | Shell | bash, with starship |
 | Graphics | NVIDIA open kernel modules, inherited from the base |
 | Target | RTX 3060 (Ampere), single GPU |
