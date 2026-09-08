@@ -193,6 +193,7 @@ RUN /tmp/scripts/10-packages.sh
 RUN /tmp/scripts/12-session.sh
 RUN /tmp/scripts/15-tailscale.sh
 RUN /tmp/scripts/18-performance.sh
+RUN /tmp/scripts/20-zoom.sh
 
 COPY --from=fetch /out/starship /usr/bin/starship
 COPY --from=fetch /out/mise /usr/bin/mise
