@@ -326,6 +326,27 @@ test: build
     # The payload must actually contain a runnable brew, not just unpack cleanly.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'tar --zstd -tf /usr/share/homebrew.tar.zst | grep -q "^home/linuxbrew/.linuxbrew/bin/brew$" && echo "brew payload: ok"'
+    # Zoom, as a Flatpak. The flathub remote comes from base-nvidia's
+    # /etc/flatpak/remotes.d/flathub.flatpakrepo -- flatpak lists a remote
+    # defined there even before flatpak-add-fedora-repos.service has ever run,
+    # which is what makes it "configured in the image" rather than something
+    # only first boot produces. Assert it by name rather than assuming, the
+    # same reason the NVIDIA driver flavour is asserted by name.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'flatpak remote-list --system | grep -qx flathub \
+         && systemctl is-enabled flatpak-add-fedora-repos.service >/dev/null \
+         && echo "flathub remote configured: ok"'
+    # A flatpak system install itself lives under /var/lib/flatpak --
+    # deployment state, not the image's immutable /usr -- so Zoom cannot be
+    # baked into the image the same way Homebrew cannot. Assert the first-boot
+    # unit that pulls it from flathub is present, enabled and names the right
+    # app.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'test -x /usr/libexec/scorched-zoom-setup \
+         && bash -n /usr/libexec/scorched-zoom-setup \
+         && grep -q "us.zoom.Zoom" /usr/libexec/scorched-zoom-setup \
+         && systemctl is-enabled scorched-zoom-setup.service >/dev/null \
+         && echo "zoom provisioning wired up: ok"'
     # Last, because a pass means nothing if the tag no longer names the image
     # that passed. Anything else building concurrently moves it, and the next
     # command someone runs against the tag -- `podman save`, `just vm`, a rebase

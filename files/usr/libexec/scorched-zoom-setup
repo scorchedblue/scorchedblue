@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+# Install the Zoom flatpak system-wide on first boot with network access.
+#
+# A flatpak system install lives under /var/lib/flatpak -- deployment state,
+# not the image's immutable /usr -- so the image can only ship the flathub
+# remote (from base-nvidia's flatpak-add-fedora-repos.service) and this unit
+# to pull Zoom once the network is up. Same shape as scorched-brew-setup: the
+# image carries what it can, and a first-boot unit provisions the rest.
+set -euo pipefail
+
+app=us.zoom.Zoom
+
+flatpak info --system "${app}" >/dev/null 2>&1 && {
+    echo "zoom already present"
+    exit 0
+}
+
+flatpak install --system --noninteractive flathub "${app}"
+
+echo "zoom provisioned"

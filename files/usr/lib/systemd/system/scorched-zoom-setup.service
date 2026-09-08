@@ -1,0 +1,13 @@
+[Unit]
+Description=Install the Zoom flatpak from Flathub on first boot
+Wants=network-online.target
+After=network-online.target flatpak-add-fedora-repos.service
+ConditionPathExists=/etc/flatpak/remotes.d/flathub.flatpakrepo
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/scorched-zoom-setup
+
+[Install]
+WantedBy=multi-user.target
