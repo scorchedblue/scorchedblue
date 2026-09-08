@@ -115,6 +115,35 @@ test: build
         'test -f /etc/tmux.conf \
          && ! (echo | timeout 2 tmux -f /etc/tmux.conf -C new-session -d -s t 2>&1 | grep -q "%config-error") \
          && echo "tmux config: ok"'
+    # starship ships in the image (see Containerfile) but wires up nothing on
+    # its own, and unlike tmux it has no system-wide config path of its own to
+    # fall back to -- it only ever reads $STARSHIP_CONFIG or
+    # ~/.config/starship.toml. files/etc/profile.d/scorchedblue-starship.sh is
+    # what bridges the two, so a file-exists check is not enough: a wrong
+    # table name in the TOML (this shipped once as `[palette.x]` instead of
+    # the plural `[palettes.x]` starship actually reads) fails silent -- no
+    # error, just a silent fall-back to starship's own defaults -- so the
+    # thing worth asserting is that an interactive shell actually ends up
+    # initialised against our file. `bash -i` because our script gates on
+    # interactivity the same way /etc/bashrc does, and `su - tester` because
+    # this is the real login chain (/etc/profile -> profile.d), not a
+    # container's root shell.
+    podman run --rm {{ image }}:{{ tag }} test -f /etc/starship.toml
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'useradd -m -u 1000 tester >/dev/null 2>&1; \
+         out="$(echo "echo STARSHIP_CONFIG=\$STARSHIP_CONFIG SESSION_KEY_SET=\${STARSHIP_SESSION_KEY:+yes}" | su - tester -c "bash -i" 2>&1)"; \
+         echo "$out" | grep -q "STARSHIP_CONFIG=/etc/starship.toml SESSION_KEY_SET=yes" \
+         && echo "starship default wiring: ok"'
+    # A user's own choice must still win, or "overridable by user files" is
+    # just a claim in an issue rather than something that actually holds.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'useradd -m -u 1000 tester >/dev/null 2>&1; \
+         mkdir -p /home/tester/.config; \
+         echo "format = \"USERFILE\"" > /home/tester/.config/starship.toml; \
+         chown -R tester:tester /home/tester; \
+         out="$(echo "echo STARSHIP_CONFIG=\$STARSHIP_CONFIG" | su - tester -c "bash -i" 2>&1)"; \
+         echo "$out" | grep -q "^STARSHIP_CONFIG=$" \
+         && echo "starship user config file wins: ok"'
     # base-nvidia must not have dragged in a desktop environment.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '! rpm -q gnome-shell gdm mutter >/dev/null 2>&1 && echo "no inherited desktop: ok"'
