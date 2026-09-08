@@ -1,0 +1,43 @@
+# ScorchedBlue -- system default starship configuration.
+#
+# Unlike tmux, starship has no system-wide config path of its own to sit
+# alongside a user file -- it only ever reads $STARSHIP_CONFIG or
+# ~/.config/starship.toml (`starship --help`, CONFIGURATION). This file is
+# pointed at by files/etc/profile.d/scorchedblue-starship.sh, and only when
+# the user has not already set STARSHIP_CONFIG or written their own
+# ~/.config/starship.toml, which reproduces the same "system default, user
+# file wins" shape tmux gets natively.
+#
+# Colours are placeholders. P4 (the theme engine) owns the actual palette;
+# this file exists to give the prompt a structure to land those values into,
+# the same reasoning files/etc/tmux.conf uses to leave its status bar
+# unstyled.
+
+palette = "scorchedblue"
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$character"""
+
+[palettes.scorchedblue]
+fg = "white"
+accent = "blue"
+error = "red"
+muted = "bright-black"
+
+[directory]
+style = "fg:accent"
+truncation_length = 3
+
+[git_branch]
+style = "fg:muted"
+format = "[$branch]($style) "
+
+[git_status]
+style = "fg:error"
+
+[character]
+success_symbol = "[❯](fg:accent)"
+error_symbol = "[❯](fg:error)"
