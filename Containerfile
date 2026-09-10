@@ -43,7 +43,7 @@ ARG STARSHIP_SHA256=b7c232b0e8249d8e55a40beb79c5c43a7d370f3f9408bd215deb0170daea
 ARG STARSHIP_TARBALL=starship-x86_64-unknown-linux-musl.tar.gz
 
 RUN mkdir -p /out \
-    && curl -fsSLO "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${STARSHIP_TARBALL}" \
+    && curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${STARSHIP_TARBALL}" \
     && echo "${STARSHIP_SHA256}  ${STARSHIP_TARBALL}" | sha256sum -c - \
     && tar -xzf "${STARSHIP_TARBALL}" -C /out starship \
     && /out/starship --version
@@ -60,7 +60,7 @@ ARG MISE_VERSION=v2026.9.1
 ARG MISE_SHA256=fb5111a3e46389bcfc026632e5dc0cfdd45b6565146c21bdb9c7a75ccefbc193
 ARG MISE_BINARY=mise-v2026.9.1-linux-x64-musl
 
-RUN curl -fsSL -o /out/mise \
+RUN curl -fsSL --proto '=https' --proto-redir '=https' -o /out/mise \
     "https://github.com/jdx/mise/releases/download/${MISE_VERSION}/${MISE_BINARY}" \
     && echo "${MISE_SHA256}  /out/mise" | sha256sum -c - \
     && chmod +x /out/mise \
@@ -79,7 +79,7 @@ ARG XH_VERSION=v0.26.2
 ARG XH_SHA256=8c53b6a23435754f9e2ea8ab8c0d0296a1921404b88132cf9b364ff6e8c22a6e
 ARG XH_TARBALL=xh-v0.26.2-x86_64-unknown-linux-musl.tar.gz
 
-RUN curl -fsSLO "https://github.com/ducaale/xh/releases/download/${XH_VERSION}/${XH_TARBALL}" \
+RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/ducaale/xh/releases/download/${XH_VERSION}/${XH_TARBALL}" \
     && echo "${XH_SHA256}  ${XH_TARBALL}" | sha256sum -c - \
     && tar -xzf "${XH_TARBALL}" -C /out --strip-components=1 \
     --wildcards '*/xh' \
@@ -107,10 +107,6 @@ ARG SCORCHED_BINARY=scorched-x86_64-unknown-linux-musl
 # unrecognised argument is an unknown subcommand and exits 1. Bare `scorched`
 # prints "scorched <version>", and matching the whole line asserts the artefact
 # is the version this pins rather than merely that something executable landed.
-# --proto '=https' --proto-redir '=https' because -L follows redirects and a
-# GitHub release download is several of them. Without these, a redirect to a
-# plain-http host would be followed silently; the pinned hash would still catch
-# a substituted artefact, but the request would have gone out in the clear.
 RUN curl -fsSL --proto '=https' --proto-redir '=https' -o /out/scorched \
     "https://github.com/scorchedblue/scorched-tools/releases/download/${SCORCHED_VERSION}/${SCORCHED_BINARY}" \
     && echo "${SCORCHED_SHA256}  /out/scorched" | sha256sum -c - \
@@ -137,7 +133,7 @@ FROM ${BASE_IMAGE}@${BASE_DIGEST} AS brew
 ARG BREW_VERSION=6.0.21
 ARG BREW_SHA256=79520db64e9f43d26ecb11fdb443e4a62e6a78b3eab1e84b215e9a35de5dba68
 
-RUN curl -fsSLO "https://github.com/Homebrew/brew/archive/refs/tags/${BREW_VERSION}.tar.gz" \
+RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/Homebrew/brew/archive/refs/tags/${BREW_VERSION}.tar.gz" \
     && echo "${BREW_SHA256}  ${BREW_VERSION}.tar.gz" | sha256sum -c - \
     && mkdir -p /brewroot/home/linuxbrew/.linuxbrew/Homebrew \
     && tar -xzf "${BREW_VERSION}.tar.gz" --strip-components=1 \
@@ -196,7 +192,7 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
         wayland-devel wayland-protocols-devel \
         jemalloc-devel pipewire-devel pam-devel polkit-devel glib2-devel
 
-RUN curl -fsSLO "https://github.com/quickshell-mirror/quickshell/archive/refs/tags/${QUICKSHELL_VERSION}.tar.gz" \
+RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/quickshell-mirror/quickshell/archive/refs/tags/${QUICKSHELL_VERSION}.tar.gz" \
     && echo "${QUICKSHELL_SHA256}  ${QUICKSHELL_VERSION}.tar.gz" | sha256sum -c - \
     && tar -xzf "${QUICKSHELL_VERSION}.tar.gz" \
     && cmake -GNinja -B /build -S "quickshell-${QUICKSHELL_VERSION#v}" \
@@ -292,8 +288,8 @@ RUN got="$(rpm -q --qf '%{version}' zig)"; \
     fi; \
     echo "OK: zig ${got} matches expected ${ZIG_VERSION}"
 
-RUN curl -fsSLO "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz" \
-    && curl -fsSLO "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz.minisig" \
+RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz" \
+    && curl -fsSLO --proto '=https' --proto-redir '=https' "https://release.files.ghostty.org/${GHOSTTY_VERSION}/ghostty-${GHOSTTY_VERSION}.tar.gz.minisig" \
     && minisign -V -m "ghostty-${GHOSTTY_VERSION}.tar.gz" \
         -x "ghostty-${GHOSTTY_VERSION}.tar.gz.minisig" \
         -P "${GHOSTTY_MINISIGN_KEY}" \
