@@ -189,7 +189,14 @@ belongs to a systemd unit, not a recipe.
 `just ci` is what CI runs; keep them identical. `security` is **report-only** —
 its findings are inherited from the base and cannot be fixed here.
 `security-diff` is the gate that matters: it fails if our layers introduce a CVE
-the base does not carry.
+the base does not carry, and it **runs in `ci`**. It did not, for a while, which
+meant the judgement it exists to force was being made silently by omission.
+
+Anything knowingly accepted goes in `.trivyignore.yaml` **with an expiry date**,
+and with a statement honest enough to re-read later. `security-diff` passes that
+file explicitly via `--ignorefile`; trivy does not auto-detect it, so removing
+that flag disables every exception without any error. `security` does not use
+the file at all — a report that fails nothing should hide nothing.
 
 ## Unattended sessions
 

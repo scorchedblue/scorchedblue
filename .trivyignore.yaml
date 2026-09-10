@@ -1,0 +1,33 @@
+# Vulnerabilities knowingly accepted, with an expiry date on each.
+#
+# Read by `just security-diff` via an explicit `--ignorefile`. That flag is not
+# optional: trivy's default ignore file is `.trivyignore`, and it does NOT
+# auto-detect this YAML form -- verified against trivy 0.74.0, where the same
+# CVE is reported with this file present and suppressed only when the flag is
+# passed. Drop the flag and every exception here silently stops applying.
+#
+# `just security` deliberately does NOT use this file. It is report-only, and
+# its job is to show everything the image carries; suppressing findings in a
+# report that fails nothing would hide information and buy nothing.
+#
+# expired_at is the point. An exception that cannot expire becomes permanent by
+# inattention. Trivy re-reports a vulnerability the day its date passes --
+# verified, not assumed -- so CI goes red and someone has to look again.
+
+vulnerabilities:
+  - id: CVE-2026-46602
+    statement: >-
+      Bundled golang.org/x/image v0.41.0 in /usr/bin/tailscale. An
+      image-decoding denial of service, reachable only by feeding the tailscale
+      CLI a hostile TIFF or WebP -- not a path that arises in normal use of the
+      client. Accepted because there is no upgrade: 1.102.3 is current stable
+      and upstream has not rebuilt against a fixed x/image. Waiting is the only
+      route. Re-check whether tailscale has been rebuilt before extending this.
+    expired_at: 2026-12-10
+
+  - id: CVE-2026-46603
+    statement: >-
+      Same package, same binary, same reasoning as CVE-2026-46602. Both arrived
+      together from the same bundled dependency and will leave together when
+      upstream rebuilds.
+    expired_at: 2026-12-10

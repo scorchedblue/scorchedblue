@@ -455,9 +455,14 @@ security-diff: build
     for _ in $(seq 1 20); do [ -S "$sock" ] && break; sleep 0.5; done
     [ -S "$sock" ] || { echo "podman socket did not start" >&2; exit 1; }
     base="$(grep -oP '(?<=^ARG BASE_IMAGE=).*' Containerfile)@$(grep -oP '(?<=^ARG BASE_DIGEST=).*' Containerfile)"
+    # --ignorefile is NOT optional. trivy's default ignore file is `.trivyignore`
+    # and it does not auto-detect the YAML form: with .trivyignore.yaml present
+    # but this flag absent, every exception in it silently stops applying.
+    # Verified against trivy 0.74.0 rather than assumed.
     scan() {
         DOCKER_HOST="unix://$sock" trivy image --image-src docker --quiet \
             --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+            --ignorefile .trivyignore.yaml \
             --skip-dirs sysroot/ostree/repo --timeout 30m --format json "$1" \
             | jq -r '.Results[]?.Vulnerabilities[]?.VulnerabilityID' | sort -u
     }
@@ -558,4 +563,9 @@ clean:
 secrets:
     gitleaks detect --no-banner --redact
 
-ci: lint secrets test security
+# `security-diff` is in here, and that is the change this recipe exists to carry.
+# It was written as "the gate that matters" and then never ran, so the judgement
+# it was meant to force was being made by omission every day. It costs one more
+# trivy pass over the base and the image; the base is already local from the
+# build, so there is no extra pull.
+ci: lint secrets test security security-diff
