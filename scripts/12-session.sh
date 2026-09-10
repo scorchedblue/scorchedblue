@@ -84,6 +84,20 @@ dnf5 -y install --setopt=install_weak_deps=False \
     qt6-qtsvg \
     jemalloc
 
+### Ghostty runtime ---------------------------------------------------------
+# Also from a builder stage. gtk4, libadwaita, gstreamer1 and
+# gstreamer1-plugins-base are already in base-nvidia, so this is the whole
+# runtime cost: gtk4-layer-shell, which ghostty links for its quick-terminal
+# surface. Installed here rather than assumed, because "the base happens to
+# carry it" is exactly the kind of fact a base bump can retract -- and a
+# missing .so makes the terminal fail to exec with nothing else to explain it.
+dnf5 -y install --setopt=install_weak_deps=False \
+    gtk4 \
+    libadwaita \
+    gtk4-layer-shell \
+    gstreamer1 \
+    gstreamer1-plugins-base
+
 systemctl enable greetd.service
 systemctl set-default graphical.target
 
