@@ -85,6 +85,34 @@ RUN curl -fsSLO "https://github.com/ducaale/xh/releases/download/${XH_VERSION}/$
     --wildcards '*/xh' \
     && /out/xh --version
 
+# scorched -- this project's own CLI, from the scorched-tools repository.
+#
+# Vendored by pinned hash rather than built here, which is what scorched-tools
+# issue #1 settled. A builder stage would be correct by construction but puts a
+# Rust compile on the critical path of every image build; the published binary
+# is static musl, so there is no glibc question to answer either way.
+#
+# The version lives in two places by design -- the tag over there, the ARG here.
+# That is the accepted cost of this route, and the release workflow refuses to
+# publish a tag that disagrees with its own Cargo.toml.
+#
+# The hash is pinned here rather than fetched. The release publishes a
+# SHA256SUMS beside the asset, and fetching that from the host serving the asset
+# would verify very little -- the reasoning already recorded for starship and xh.
+ARG SCORCHED_VERSION=v0.1.0
+ARG SCORCHED_SHA256=2fada4c8e90f8c5718c2dd7dbb88855177f0e1b02513cb82ffc9ac899b192a96
+ARG SCORCHED_BINARY=scorched-x86_64-unknown-linux-musl
+
+# Run it with NO arguments. `scorched --version` is not a thing: any
+# unrecognised argument is an unknown subcommand and exits 1. Bare `scorched`
+# prints "scorched <version>", and matching the whole line asserts the artefact
+# is the version this pins rather than merely that something executable landed.
+RUN curl -fsSL -o /out/scorched \
+    "https://github.com/scorchedblue/scorched-tools/releases/download/${SCORCHED_VERSION}/${SCORCHED_BINARY}" \
+    && echo "${SCORCHED_SHA256}  /out/scorched" | sha256sum -c - \
+    && chmod +x /out/scorched \
+    && /out/scorched | grep -qx "scorched ${SCORCHED_VERSION#v}"
+
 # ---------------------------------------------------------------------------
 # Homebrew payload.
 #
@@ -313,6 +341,7 @@ RUN /tmp/scripts/20-zoom.sh
 COPY --from=fetch /out/starship /usr/bin/starship
 COPY --from=fetch /out/mise /usr/bin/mise
 COPY --from=fetch /out/xh /usr/bin/xh
+COPY --from=fetch /out/scorched /usr/bin/scorched
 COPY --from=brew /homebrew.tar.zst /usr/share/homebrew.tar.zst
 COPY --from=quickshell /out/ /
 COPY --from=ghostty /out/ /
