@@ -86,14 +86,14 @@ scorched-claude version="2.1.260":
         echo "Not the pinned version -- falling back to upstream's manifest."
         echo "That hash is served by the same host as the binary, so it proves"
         echo "less than the pinned one. Bump the pin instead, if this is a keeper."
-        checksum="$(curl -fsSL "${base}/{{ version }}/manifest.json" \
+        checksum="$(curl -fsSL --proto '=https' --proto-redir '=https' "${base}/{{ version }}/manifest.json" \
             | jq -r ".platforms[\"${platform}\"].checksum // empty")"
     fi
     [[ "${checksum}" =~ ^[a-f0-9]{64}$ ]] || {
         echo "No usable checksum for ${platform} at version {{ version }}" >&2
         exit 1
     }
-    curl -fsSL -o "${tmp}/claude" "${base}/{{ version }}/${platform}/claude"
+    curl -fsSL --proto '=https' --proto-redir '=https' -o "${tmp}/claude" "${base}/{{ version }}/${platform}/claude"
     echo "${checksum}  ${tmp}/claude" | sha256sum -c -
     chmod +x "${tmp}/claude"
     # The binary's own `install` sets up the versions directory, the

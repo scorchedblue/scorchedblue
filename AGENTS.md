@@ -54,6 +54,12 @@ without re-arguing them.
 - **Vendored binaries are pinned by version and hash**, fetched from upstream
   releases. No `curl | bash`, no COPR for anything that could be a static
   binary.
+- **Every `curl` passes `--proto '=https' --proto-redir '=https'`.** `-L`
+  follows redirects and a release download is several of them, so without these
+  a redirect to a plain-http host is followed silently. The pinned hash still
+  catches a *substituted* artefact; it does not stop the request going out in
+  the clear. This applies to `ujust` recipes too, which fetch on a booted
+  machine rather than at build time.
 
 ## NVIDIA
 
