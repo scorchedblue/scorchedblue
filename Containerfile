@@ -180,6 +180,21 @@ RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/Home
 # ---------------------------------------------------------------------------
 FROM ${BASE_IMAGE}@${BASE_DIGEST} AS quickshell
 
+# INSTALL_QML_PREFIX below is not optional decoration. Upstream installs each
+# module's `qmldir` and `.qmltypes` only when INSTALL_QMLDIR or
+# INSTALL_QML_PREFIX is set, and takes a branch that warns "QML modules will not
+# be installed" when neither is -- which is what this stage did until now. The
+# shell still ran, because quickshell registers its types in-process, so the
+# absence was silent for as long as nobody looked from outside the process.
+#
+# Everything outside the process needs those files: qmllint cannot resolve a
+# single Quickshell type without them (1559 warnings across scorched-desktop's
+# 46 QML files, essentially all cascade from six failed imports), and neither
+# can qmlls. See scorched-desktop#23.
+#
+# The `test -f` on the qmldir is deliberate. The failure this fixes was a
+# warning nobody read; it must not be able to become one again.
+
 ARG QUICKSHELL_VERSION=v0.3.1
 ARG QUICKSHELL_SHA256=218f6327293928bcb1f9b25728b336c4ab125f67fe1babd7d47313f890a16c99
 
@@ -199,10 +214,12 @@ RUN curl -fsSLO --proto '=https' --proto-redir '=https' "https://github.com/quic
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DDISTRIBUTOR=ScorchedBlue \
+        -DINSTALL_QML_PREFIX=lib64/qt6/qml \
         -DCRASH_HANDLER=OFF -DX11=OFF -DI3=OFF -DI3_IPC=OFF \
     && cmake --build /build \
     && DESTDIR=/out cmake --install /build \
-    && /out/usr/bin/quickshell --version
+    && /out/usr/bin/quickshell --version \
+    && test -f /out/usr/lib64/qt6/qml/Quickshell/qmldir
 
 # ---------------------------------------------------------------------------
 # Ghostty, built from source.

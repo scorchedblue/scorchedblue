@@ -219,6 +219,16 @@ test: build
     # Layershell is what the bar anchors to; without it the shell cannot exist.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'quickshell --help >/dev/null 2>&1 && echo "quickshell: ok"'
+    # Quickshell's QML modules, which are a separate thing from its binary and
+    # were absent for a long time without anything noticing -- the shell runs
+    # regardless, because quickshell registers its types in-process. Everything
+    # that reads the QML from outside needs these: qmllint and qmlls resolve
+    # nothing without them. Assert both files, not just the directory: the
+    # typeinfo is the half that carries the types.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'test -f /usr/lib64/qt6/qml/Quickshell/qmldir \
+         && ls /usr/lib64/qt6/qml/Quickshell/*.qmltypes >/dev/null \
+         && echo "quickshell qml modules: ok"'
     # Ghostty, also built from source. Run it rather than `command -v` it: the
     # builder stage links GTK4, libadwaita, gstreamer and gtk4-layer-shell out
     # of the base, so a missing runtime library would leave the binary present
