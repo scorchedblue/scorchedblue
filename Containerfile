@@ -107,7 +107,11 @@ ARG SCORCHED_BINARY=scorched-x86_64-unknown-linux-musl
 # unrecognised argument is an unknown subcommand and exits 1. Bare `scorched`
 # prints "scorched <version>", and matching the whole line asserts the artefact
 # is the version this pins rather than merely that something executable landed.
-RUN curl -fsSL -o /out/scorched \
+# --proto '=https' --proto-redir '=https' because -L follows redirects and a
+# GitHub release download is several of them. Without these, a redirect to a
+# plain-http host would be followed silently; the pinned hash would still catch
+# a substituted artefact, but the request would have gone out in the clear.
+RUN curl -fsSL --proto '=https' --proto-redir '=https' -o /out/scorched \
     "https://github.com/scorchedblue/scorched-tools/releases/download/${SCORCHED_VERSION}/${SCORCHED_BINARY}" \
     && echo "${SCORCHED_SHA256}  /out/scorched" | sha256sum -c - \
     && chmod +x /out/scorched \
