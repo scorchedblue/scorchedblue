@@ -289,6 +289,24 @@ test: build
     # and a `command -v` check would not notice.
     podman run --rm {{ image }}:{{ tag }} mise --version
     podman run --rm {{ image }}:{{ tag }} xh --version
+    # scorched is vendored from its own repository's release, so this asserts
+    # the artefact is the version the Containerfile pins and not merely that
+    # something executable arrived. Read the expected version from the ARG so a
+    # bump cannot leave the assertion behind, and match the whole line.
+    #
+    # Bare `scorched`, not `scorched --version`: any unrecognised argument is an
+    # unknown subcommand and exits 1. The no-argument path is what prints the
+    # version.
+    scorched_version="$(grep -oP '(?<=^ARG SCORCHED_VERSION=v).*' Containerfile)"
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        "scorched | grep -qx 'scorched ${scorched_version}'" \
+        && echo "scorched ${scorched_version}: ok"
+    # The whole point of vendoring rather than building in a stage: no Rust
+    # toolchain reaches the image. If one ever does, the route chosen in
+    # scorched-tools#1 has quietly been abandoned.
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        '! command -v cargo >/dev/null && ! command -v rustc >/dev/null \
+         && echo "no rust toolchain in the image: ok"'
     # httpie must stay out: it drags a python runtime stack into /usr, which is
     # what the admission test exists to exclude. xh is its replacement.
     podman run --rm {{ image }}:{{ tag }} bash -c \
