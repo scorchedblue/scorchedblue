@@ -32,7 +32,21 @@ jobs:
       # truth, so local and CI cannot drift.
       MISE_DISABLE_TOOLS: trivy
     steps:
+      # fetch-depth: 0 because `just ci` runs `just secrets`, which is
+      # `gitleaks detect` -- a history scan. actions/checkout defaults to
+      # fetch-depth: 1, so gitleaks was walking one grafted commit and
+      # reporting "1 commits scanned", while the justfile, the pre-commit hook
+      # and .gitleaks.toml all describe it as the full-history scan.
+      #
+      # The tree as checked out was still covered: a grafted root diffs as
+      # all-additions, so a secret present in a file today was found. What was
+      # not covered is a secret that only exists in history -- added in one
+      # commit and removed in a later one. That is exactly the case the
+      # pre-commit hook delegates to CI, because `protect --staged` cannot see
+      # it either, so between them nothing was checking it at all.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       # The built image is ~10GB uncompressed and the base another ~7.5GB, so a
       # stock runner's free space is not enough. These are the large
