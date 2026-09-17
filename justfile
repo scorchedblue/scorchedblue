@@ -31,6 +31,23 @@ build:
     podman build -t {{ image }}:{{ tag }} .
 
 # Assertions against the built image. Requires `just build` first.
+#
+# HOUSE RULE for every assertion below: the `&& echo "...: ok"` goes INSIDE the
+# quoted command, never after it at recipe level. `set -e` does not fire on a
+# command that fails on the left of `&&` -- bash exempts "any command executed
+# in a && or || list except the command following the final &&" -- so
+#
+#     podman run ... bash -c "assertion" && echo "thing: ok"     # WRONG
+#
+# skips the echo, returns 1, and lets the recipe carry on. The recipe's exit
+# status is its last command, so a failed assertion in that shape leaves
+# `just test` and `just ci` GREEN. Four of them did, until #33.
+#
+#     podman run ... bash -c "assertion && echo 'thing: ok'"     # RIGHT
+#
+# Here the failure is the container's exit status, which is the podman run's
+# exit status, which `set -e` does act on. The only signal the wrong form gives
+# is a missing `ok` line in a passing trace, and nobody reads a passing trace.
 test: build
     #!/usr/bin/bash
     set -euxo pipefail
@@ -237,8 +254,8 @@ test: build
     # `grep Ghostty` would pass on any version at all.
     ghostty_version="$(grep -oP '(?<=^ARG GHOSTTY_VERSION=).*' Containerfile)"
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        "ghostty --version | head -1 | grep -qx 'Ghostty ${ghostty_version}'" \
-        && echo "ghostty ${ghostty_version}: ok"
+        "ghostty --version | head -1 | grep -qx 'Ghostty ${ghostty_version}' \
+         && echo 'ghostty ${ghostty_version}: ok'"
     # The terminfo entry is not optional furniture. Nothing here is installed by
     # RPM -- it all arrives via COPY --from=ghostty -- so this is what proves
     # the install tree came across and not just the binary. Without it every
@@ -257,8 +274,9 @@ test: build
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '! rpm -q gcc make binutils nodejs22 tree-sitter-cli >/dev/null 2>&1 && echo "no toolchain leak: ok"'
     # ... but the clipboard bridge must survive, or yanking silently breaks.
-    podman run --rm {{ image }}:{{ tag }} rpm -q wl-clipboard inotify-tools >/dev/null \
-        && echo "wayland clipboard: ok"
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'rpm -q wl-clipboard inotify-tools >/dev/null \
+         && echo "wayland clipboard: ok"'
     # Our ujust recipes must actually be reachable. ujust runs a composed
     # justfile whose only extension point is an OPTIONAL import of
     # 60-custom.just -- any other filename is ignored without error, so this
@@ -309,8 +327,8 @@ test: build
     # version.
     scorched_version="$(grep -oP '(?<=^ARG SCORCHED_VERSION=v).*' Containerfile)"
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        "scorched | grep -qx 'scorched ${scorched_version}'" \
-        && echo "scorched ${scorched_version}: ok"
+        "scorched | grep -qx 'scorched ${scorched_version}' \
+         && echo 'scorched ${scorched_version}: ok'"
     # The whole point of vendoring rather than building in a stage: no Rust
     # toolchain reaches the image. If one ever does, the route chosen in
     # scorched-tools#1 has quietly been abandoned.
@@ -351,8 +369,8 @@ test: build
     # it said "silverblue" for weeks after the base first moved.
     base_name="$(basename "$(grep -oP '(?<=^ARG BASE_IMAGE=).*' Containerfile)")"
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        "jq -e '.\"base-image-name\" == \"$base_name\"' /usr/share/ublue-os/image-info.json >/dev/null" \
-        && echo "image-info base-image-name matches Containerfile: ok"
+        "jq -e '.\"base-image-name\" == \"$base_name\"' /usr/share/ublue-os/image-info.json >/dev/null \
+         && echo 'image-info base-image-name matches Containerfile: ok'"
     # Homebrew payload and its first-boot unit.
     podman run --rm {{ image }}:{{ tag }} test -f /usr/share/homebrew.tar.zst
     podman run --rm {{ image }}:{{ tag }} test -x /usr/libexec/scorched-brew-setup
