@@ -163,7 +163,11 @@ test: build
          && echo "starship user config file wins: ok"'
     # base-nvidia must not have dragged in a desktop environment.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        '! rpm -q gnome-shell gdm mutter >/dev/null 2>&1 && echo "no inherited desktop: ok"'
+        'for p in gnome-shell gdm mutter; do \
+             if rpm -q "$p" >/dev/null 2>&1; then \
+                 echo "must not be in the image: $p" >&2; exit 1; \
+             fi; \
+         done; echo "no inherited desktop: ok"'
     # The session: compositor, portal and greeter.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'command -v Hyprland >/dev/null && rpm -q xdg-desktop-portal-hyprland >/dev/null \
@@ -227,8 +231,12 @@ test: build
     # org.freedesktop.Notifications, after which the shell receives nothing and
     # logs nothing. Assert the package AND its activation file are gone.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        '! rpm -q mako fuzzel >/dev/null 2>&1 \
-         && test ! -e /usr/share/dbus-1/services/fr.emersion.mako.service \
+        'for p in mako fuzzel; do \
+             if rpm -q "$p" >/dev/null 2>&1; then \
+                 echo "must not be in the image: $p" >&2; exit 1; \
+             fi; \
+         done; \
+         test ! -e /usr/share/dbus-1/services/fr.emersion.mako.service \
          && echo "no notification daemon conflict: ok"'
     # Quickshell, built against this image's Qt. It links private Qt APIs, so a
     # mismatch here is a crash at runtime rather than a build error.
@@ -264,15 +272,33 @@ test: build
         'test -f /usr/share/terminfo/x/xterm-ghostty && echo "ghostty terminfo: ok"'
     # Leaf tools must NOT be in the image -- they belong to the Homebrew tier.
     # httpie in particular drags a Python stack into /usr if it leaks back in.
+    #
+    # `gh` and `bat` were in this list and should never have been: both are
+    # installed on purpose by scripts/10-packages.sh and asserted PRESENT in the
+    # work-surface check below. The two assertions contradicted each other and
+    # both passed, because `! rpm -q a b c` only ever meant "at least one of
+    # these is absent" (#34). Do not add them back.
+    #
+    # One package per iteration, deliberately: `rpm -q` exits non-zero when ANY
+    # name is missing, so a single `! rpm -q` over a list cannot say "none of
+    # these".
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        '! rpm -q httpie gh zoxide bat tealdeer >/dev/null 2>&1 && echo "leaf tools absent: ok"'
+        'for p in httpie zoxide tealdeer; do \
+             if rpm -q "$p" >/dev/null 2>&1; then \
+                 echo "must not be in the image: $p" >&2; exit 1; \
+             fi; \
+         done; echo "leaf tools absent: ok"'
     podman run --rm {{ image }}:{{ tag }} bash -c \
         '! rpm -q python3-pip >/dev/null 2>&1 && echo "no python3-pip: ok"'
     # Weak deps are off deliberately: neovim Recommends tree-sitter-cli, which
     # drags 337MB of nodejs and C toolchain into a runtime image. If any of these
     # reappear, install_weak_deps has leaked back on.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        '! rpm -q gcc make binutils nodejs22 tree-sitter-cli >/dev/null 2>&1 && echo "no toolchain leak: ok"'
+        'for p in gcc make binutils nodejs22 tree-sitter-cli; do \
+             if rpm -q "$p" >/dev/null 2>&1; then \
+                 echo "must not be in the image: $p" >&2; exit 1; \
+             fi; \
+         done; echo "no toolchain leak: ok"'
     # ... but the clipboard bridge must survive, or yanking silently breaks.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'rpm -q wl-clipboard inotify-tools >/dev/null \
