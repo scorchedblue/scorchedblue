@@ -11,7 +11,11 @@ Type=oneshot
 # RemainAfterExit so `systemctl status` shows the setting as applied rather than
 # as a process that exited, and so the unit reads as state rather than an event.
 RemainAfterExit=yes
-ExecStart=/usr/libexec/scorched-performance
+# The Rust subcommand, not a shell wrapper. The bash original lived at
+# /usr/libexec/scorched-performance and is deleted: shipping both meant the
+# tested implementation and the running one were different files, free to drift
+# with nothing comparing them.
+ExecStart=/usr/bin/scorched performance
 
 [Install]
 WantedBy=multi-user.target

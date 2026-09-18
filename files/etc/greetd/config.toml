@@ -13,10 +13,18 @@
 vt = 1
 
 [default_session]
-# A single path with no arguments, deliberately. greetd's man page documents
-# `command` only as "the command-line" and does not say how it is split; the
-# greeter's arguments include values containing spaces, and this is the one
-# process where a bad split means nobody can log in. Everything about how the
-# greeter looks and behaves lives in that script instead.
-command = "/usr/libexec/scorched-greeter"
+# `scorched greeter`, which execs tuigreet with the full argument list. Two of
+# those arguments contain spaces -- the time format and the greeting -- and this
+# is the one process where a bad split means nobody can log in, so they stay
+# inside the binary where nothing splits them at all.
+#
+# Splitting here is not a guess: greetd(5) states that the command-line "is run
+# by sh(1), and as such accepts standard POSIX shell syntax" -- verified against
+# the greetd 0.10.3 man page this image ships. Neither word below contains a
+# space or a shell metacharacter, so sh yields exactly these two arguments.
+#
+# This replaces /usr/libexec/scorched-greeter, which was a bash wrapper around
+# the same tuigreet invocation. The wrapper is deleted rather than left in
+# place: two copies of one argv, only one of them tested, is how they drift.
+command = "/usr/bin/scorched greeter"
 user = "greetd"
