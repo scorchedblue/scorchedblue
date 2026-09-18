@@ -135,6 +135,10 @@ without re-arguing them.
   accordingly -- but `uwsm` is packaged neither in Fedora 44 nor in the Hyprland
   COPR this image builds from, so that session entry points at a binary nothing
   provides. Do not reach for it as the fix.
+  **`scripts/12-session.sh` deletes that entry**, because the greeter lists the
+  directory and would otherwise offer a session that cannot start; `just test`
+  asserts it stays deleted. If `uwsm` is ever packaged, that removal is the
+  thing to revisit.
 - **`mako` and `fuzzel` must stay out of the image.** The shell serves both
   notifications and the launcher now. mako is the dangerous one: it ships
   `/usr/share/dbus-1/services/fr.emersion.mako.service`, so leaving it installed

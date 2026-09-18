@@ -98,6 +98,26 @@ dnf5 -y install --setopt=install_weak_deps=False \
     gstreamer1 \
     gstreamer1-plugins-base
 
+### The uwsm session entry ----------------------------------------------------
+# The hyprland RPM ships two session entries, and one of them cannot start.
+# hyprland-uwsm.desktop execs `uwsm start -e -D Hyprland hyprland.desktop`, and
+# uwsm is packaged neither in Fedora 44 nor in the ashbuk COPR this image builds
+# from -- so the entry points at a binary nothing provides.
+#
+# The greeter lists the directory (`--sessions /usr/share/wayland-sessions`),
+# deliberately, so that it offers what is installed rather than a hardcoded
+# list. That is the right call and it means the fix belongs here: the way to
+# stop offering a broken session is for the broken session not to be installed.
+#
+# Selecting it is not a soft failure. greetd exec's the missing binary, the
+# session dies, and the user is returned to the greeter with nothing on screen
+# to explain it -- and `--remember-session` then pre-selects that entry next
+# time, so it repeats until someone works out the two entries differ.
+#
+# Removed by name rather than by glob: a future second entry that genuinely
+# works must not be swept up silently.
+rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop
+
 systemctl enable greetd.service
 systemctl set-default graphical.target
 

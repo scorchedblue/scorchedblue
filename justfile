@@ -202,6 +202,16 @@ test: build
     # A session must exist for the greeter to offer.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'test -f /usr/share/wayland-sessions/hyprland.desktop && echo "wayland session: ok"'
+    # ...and the one that CANNOT start must not be. The hyprland RPM ships
+    # hyprland-uwsm.desktop, which execs uwsm -- packaged neither in Fedora 44
+    # nor in the COPR. Same shape as the mako activation-file assertion below,
+    # and for the same reason: the thing that must not be there is a file, so
+    # assert the file. Asserting only that hyprland.desktop exists says nothing
+    # about a second, broken entry sitting beside it, which is how this was
+    # offered on the login screen for as long as it was (#35).
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'test ! -e /usr/share/wayland-sessions/hyprland-uwsm.desktop \
+         && echo "no unstartable session offered: ok"'
     # The portal order is load-bearing -- hyprland must win ScreenCast, or the
     # region picker is unreachable and the pivot bought nothing.
     podman run --rm {{ image }}:{{ tag }} bash -c \
