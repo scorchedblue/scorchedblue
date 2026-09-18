@@ -172,20 +172,33 @@ test: build
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'command -v Hyprland >/dev/null && rpm -q xdg-desktop-portal-hyprland >/dev/null \
          && systemctl is-enabled greetd.service >/dev/null && echo "session: ok"'
-    # greetd must launch tuigreet, not its stock agreety text greeter. That
+    # greetd must launch our greeter, not its stock agreety text greeter. That
     # default looks near-identical to a getty prompt on a screenshot, so an
     # unconfigured greeter is easy to mistake for a broken one.
+    #
+    # The command is `scorched greeter` -- the Rust subcommand -- and the bash
+    # wrapper it replaced must be GONE, not merely unused. Both halves are the
+    # assertion: the config naming the binary is what makes the port real, and
+    # the absent wrapper is what stops a second, untested copy of the greeter's
+    # argv existing beside it. #42 is what leaving both looks like.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'grep -q scorched-greeter /etc/greetd/config.toml && echo "greeter configured: ok"'
-    # The greeter is the one process where a bad argument means nobody can log
-    # in, so assert the wrapper is present, executable and parses. greetd's
-    # `command` is a bare path precisely so that argument splitting cannot be
-    # the thing that breaks it.
+        'grep -qx "command = \"/usr/bin/scorched greeter\"" /etc/greetd/config.toml \
+         && test ! -e /usr/libexec/scorched-greeter \
+         && echo "greeter is the scorched binary: ok"'
+    # ...and that subcommand must actually reach tuigreet. Run it: with no
+    # GREETD_SOCK in the environment tuigreet exits 1 saying so, which is proof
+    # the exec happened. An unknown subcommand would instead print "scorched:
+    # unknown subcommand 'greeter'" and never reach tuigreet at all, so the two
+    # outcomes are distinguishable -- which is the whole point. This is strictly
+    # stronger than the grep over the wrapper it replaces: that only ever proved
+    # a string was present in a file nobody had run.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'test -x /usr/libexec/scorched-greeter \
-         && bash -n /usr/libexec/scorched-greeter \
-         && grep -q "exec /usr/bin/tuigreet" /usr/libexec/scorched-greeter \
-         && echo "greeter wrapper: ok"'
+        'out="$(timeout 10 scorched greeter </dev/null 2>&1 || true)"; \
+         case "$out" in \
+             *"unknown subcommand"*) echo "scorched has no greeter subcommand" >&2; exit 1 ;; \
+             *GREETD_SOCK*) echo "greeter subcommand execs tuigreet: ok" ;; \
+             *) echo "unexpected greeter output: $out" >&2; exit 1 ;; \
+         esac'
     # A session must exist for the greeter to offer.
     podman run --rm {{ image }}:{{ tag }} bash -c \
         'test -f /usr/share/wayland-sessions/hyprland.desktop && echo "wayland session: ok"'
@@ -210,21 +223,31 @@ test: build
          && grep -q "^BindsTo=graphical-session.target$" \
                 /usr/lib/systemd/user/hyprland-session.target \
          && echo "session target: ok"'
-    # Performance mode must be installed AND enabled. An enabled-but-absent
-    # unit and an installed-but-disabled one both look fine in a file listing
-    # and both mean the machine quietly runs in powersave.
+    # Performance mode must run the binary AND be enabled. A unit whose
+    # ExecStart names something absent and an installed-but-disabled one both
+    # look fine in a file listing and both mean the machine quietly runs in
+    # powersave. The superseded bash helper must be gone too, for the reason
+    # given above the greeter check.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'test -x /usr/libexec/scorched-performance \
-         && bash -n /usr/libexec/scorched-performance \
+        'grep -qx "ExecStart=/usr/bin/scorched performance" \
+              /usr/lib/systemd/system/scorched-performance.service \
+         && test ! -e /usr/libexec/scorched-performance \
          && systemctl is-enabled scorched-performance.service >/dev/null \
-         && echo "performance mode: ok"'
-    # Both knobs, not just the governor: on intel_pstate the energy/performance
-    # preference holds clocks back on its own, which is the usual reason this
-    # change appears to do nothing.
+         && echo "performance mode is the scorched binary: ok"'
+    # ...and that subcommand must run. Both knobs -- the governor and the
+    # energy/performance preference, which holds clocks back on its own and is
+    # the usual reason this change appears to do nothing -- are covered by unit
+    # tests over a fixture /sys in scorched-tools, where they can be written to.
+    # What only this repository can check is that the binary it ships answers to
+    # `performance` at all. A container's /sys is not writable by the mapped
+    # root this runs as, so every write is skipped and the run is a no-op; the
+    # report line is what proves the subcommand exists. Accept both shapes of
+    # that line: a build host with no cpufreq interface -- a VM, and most CI
+    # runners -- legitimately prints the other one.
     podman run --rm {{ image }}:{{ tag }} bash -c \
-        'grep -q scaling_governor /usr/libexec/scorched-performance \
-         && grep -q energy_performance_preference /usr/libexec/scorched-performance \
-         && echo "performance knobs: ok"'
+        'scorched performance \
+         | grep -qE "^(cpufreq: [0-9]+ policies|no cpufreq interface present)" \
+         && echo "performance subcommand runs: ok"'
     # The shell serves notifications and the launcher, so mako and fuzzel must
     # not be present. mako especially: it ships a D-Bus service file, so an
     # installed-but-unstarted mako is still activated on demand and takes
@@ -399,17 +422,23 @@ test: build
          && echo 'image-info base-image-name matches Containerfile: ok'"
     # Homebrew payload and its first-boot unit.
     podman run --rm {{ image }}:{{ tag }} test -f /usr/share/homebrew.tar.zst
-    podman run --rm {{ image }}:{{ tag }} test -x /usr/libexec/scorched-brew-setup
+    podman run --rm {{ image }}:{{ tag }} bash -c \
+        'grep -qx "ExecStart=/usr/bin/scorched brew-setup" \
+              /usr/lib/systemd/system/scorched-brew-setup.service \
+         && test ! -e /usr/libexec/scorched-brew-setup \
+         && echo "brew setup is the scorched binary: ok"'
     podman run --rm {{ image }}:{{ tag }} systemctl is-enabled scorched-brew-setup.service
-    # Exercise the provisioning script the way first boot will: create the user
-    # it chowns to, run it, then run it again to prove it is idempotent. This is
-    # the closest thing to a boot test that does not need root.
+    # Exercise provisioning the way first boot will, through the binary the unit
+    # names rather than a wrapper sitting beside it: create the user it chowns
+    # to, run it, then run it again to prove it is idempotent. This is the
+    # closest thing to a boot test that does not need root, and running the real
+    # ExecStart is what makes it evidence about what boots.
     podman run --rm {{ image }}:{{ tag }} bash -c '\
         useradd -m -u 1000 tester 2>/dev/null || true; \
-        /usr/libexec/scorched-brew-setup >/dev/null; \
+        scorched brew-setup >/dev/null; \
         test -x /home/linuxbrew/.linuxbrew/bin/brew || { echo "brew not executable"; exit 1; }; \
         [ "$(stat -c %u /home/linuxbrew/.linuxbrew)" = 1000 ] || { echo "wrong owner"; exit 1; }; \
-        /usr/libexec/scorched-brew-setup | grep -q "already present" || { echo "not idempotent"; exit 1; }; \
+        scorched brew-setup | grep -q "already present" || { echo "not idempotent"; exit 1; }; \
         echo "brew provisioning: ok"'
     # The payload must actually contain a runnable brew, not just unpack cleanly.
     podman run --rm {{ image }}:{{ tag }} bash -c \

@@ -30,6 +30,30 @@ without re-arguing them.
 - **Rust owns everything that runs on a booted machine.** The `scorched` CLI,
   the theme engine, the helpers the shell spawns, and the libexec units. Not Go,
   not Python.
+
+  **Not yet true everywhere, and the gap is named rather than assumed.** This
+  was written down before the switch-over happened: scorched-tools ported the
+  helpers, with tests, and every consumer went on calling the bash original, so
+  the image shipped two implementations of each and ran the untested one. #42.
+  What holds now:
+
+  - `scorched-performance.service`, `scorched-brew-setup.service` and greetd's
+    `default_session.command` run `scorched performance`, `scorched brew-setup`
+    and `scorched greeter`. The bash originals are deleted, and `just test`
+    asserts both the binary is what runs and the original is gone.
+  - `/usr/libexec/scorched-zoom-setup` is **still bash**, because no Rust
+    equivalent exists. It is the only file left under `files/usr/libexec/`,
+    and the only reason `just lint` still reaches into that directory.
+  - The helpers the shell spawns (`apps.sh`, `screen-power.sh`,
+    `audio-levels.sh`) live in `scorched-desktop` and still call bash. The
+    first two are blocked on scorched-tools#23 and #22.
+  - **There is no theme engine in the pinned `scorched`.** `SCORCHED_VERSION`
+    is `v0.1.0`, which has no `theme` subcommand at all -- it landed after that
+    tag. Nothing here can invoke it until the ARG moves.
+
+  Treat a bug filed against a subcommand nothing calls as **latent**: real, but
+  not reachable from a booted session, and not the severity its issue implies.
+  Delete a bullet above when it stops describing reality, not before.
 - **Build scripts stay bash.** `scripts/*.sh` run inside the Containerfile;
   porting them would mean compiling a binary during the build in order to run
   the build, and shell is the right language for "install packages, assert

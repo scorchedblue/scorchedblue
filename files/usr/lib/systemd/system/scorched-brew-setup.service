@@ -10,7 +10,10 @@ ConditionPathExists=/usr/share/homebrew.tar.zst
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/libexec/scorched-brew-setup
+# The Rust subcommand, not a shell wrapper -- see scorched-performance.service
+# for why the bash original at /usr/libexec/scorched-brew-setup is gone rather
+# than merely unused.
+ExecStart=/usr/bin/scorched brew-setup
 
 [Install]
 WantedBy=default.target multi-user.target
